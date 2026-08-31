@@ -1,0 +1,701 @@
+/* Common Tab Styling */
+.tab-container {
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+/* My Herd Styles */
+.animal-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.animal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.healthy {
+  background: rgba(21, 128, 61, 0.1);
+  color: var(--success);
+}
+
+.status-badge.sick {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.animal-card-body {
+  display: flex;
+  gap: 2rem;
+}
+
+.info-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+/* Advisories Styles */
+.advisory-card {
+  display: flex;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.advisory-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  color: white;
+}
+
+.advisory-icon.alert-icon { background: #ef4444; }
+.advisory-icon.weather-icon { background: var(--primary); }
+.advisory-icon.scheme-icon { background: var(--success); }
+
+.advisory-content {
+  padding: 1.25rem;
+  flex: 1;
+}
+
+.advisory-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.advisory-text {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+/* Trends Styles */
+.mock-map-container {
+  height: 250px;
+  background: #e5e7eb;
+  border-radius: var(--border-radius-sm);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.mock-map-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.4),
+    rgba(255, 255, 255, 0.4) 10px,
+    rgba(255, 255, 255, 0.6) 10px,
+    rgba(255, 255, 255, 0.6) 20px
+  );
+}
+
+.map-markers {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+
+.marker {
+  position: absolute;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+.marker.high-risk {
+  background: #ef4444;
+  animation: pulse 2s infinite;
+}
+
+.marker.safe {
+  background: var(--success);
+}
+
+/* Hardcoded mock positions */
+.marker:nth-child(1) { top: 30%; left: 40%; }
+.marker:nth-child(2) { top: 50%; left: 60%; }
+.marker:nth-child(3) { top: 70%; left: 30%; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-card.alert-stat {
+  border-bottom: 4px solid #ef4444;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin-bottom: 0.5rem;
+}
+
+.alert-stat .stat-value {
+  color: #ef4444;
+}
+
+.stat-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.map-legend {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-color {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+}
+
+.legend-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+/* Advanced Trends Styles */
+.trends-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.critical-alert-banner {
+  background: #dc2626;
+  color: white;
+  border-radius: var(--border-radius-sm);
+  padding: 1.25rem;
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.4);
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.critical-icon {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .kpi-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.kpi-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.kpi-title {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.kpi-subtext {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.kpi-subtext.positive { color: var(--success); }
+.kpi-subtext.negative { color: #dc2626; }
+.kpi-subtext.neutral { color: var(--text-light); }
+
+.leaflet-container {
+  height: 300px;
+  width: 100%;
+  border-radius: var(--border-radius-sm);
+  z-index: 1; /* Keep it below modals */
+}
+
+@media (min-width: 768px) {
+  .leaflet-container {
+    height: 400px;
+  }
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .chart-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  letter-spacing: 0.05em;
+}
+
+/* Custom glowing marker for Leaflet Outbreak Center */
+.pulse-marker {
+  width: 24px;
+  height: 24px;
+  background: rgba(220, 38, 38, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pulse-marker::after {
+  content: '';
+  width: 12px;
+  height: 12px;
+  background: #dc2626;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  animation: pulsing 2s infinite;
+}
+
+@keyframes pulsing {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+/* User Location Glowing Radar Beacon */
+.user-custom-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.user-pulse-marker {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-pulse-radar {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.25);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+  animation: user-radar-pulse 2s cubic-bezier(0.1, 0.2, 0.7, 1) infinite;
+}
+
+.user-pulse-dot {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  background: #2563eb;
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 10px rgba(37, 99, 235, 0.8);
+  z-index: 2;
+}
+
+@keyframes user-radar-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(2.4);
+    opacity: 0.15;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Map Header and View Switch Toolbar */
+.map-header-container {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .map-header-container {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.map-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.map-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.map-action-btn:hover {
+  background: var(--bg-color);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.map-action-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.map-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 9999px;
+  font-weight: 500;
+}
+
+.gps-badge.active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.gps-badge.locating {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.gps-badge.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.gps-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+  animation: gps-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes gps-ping {
+  0% { transform: scale(0.8); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+  100% { transform: scale(0.8); opacity: 1; }
+}
+
+.proximity-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.06) 0%, rgba(59, 130, 246, 0.02) 100%);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.proximity-tag {
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.proximity-tag.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.proximity-tag.warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.proximity-tag.safe {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.map-popup-card {
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: #1e293b;
+  line-height: 1.4;
+  min-width: 170px;
+}
+
+.map-popup-card h4 {
+  margin: 0 0 0.35rem 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.map-popup-badge {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+}
+
+/* Secondary District Node Pin on Map */
+.district-node-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.district-node-marker:hover {
+  transform: scale(1.3);
+}
+
+.district-node-marker.danger {
+  background: #dc2626;
+}
+
+.district-node-marker.warning {
+  background: #f59e0b;
+}
+
+.district-node-marker.safe {
+  background: #10b981;
+}
+
+/* Filter Toolbar */
+.analytics-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 0.85rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (min-width: 768px) {
+  .analytics-filter-bar {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 0.25rem;
+}
+
+.filter-pill {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-pill:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.filter-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+/* Nearest District Suggestion Banner */
+.nearest-suggestion-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: var(--border-radius-sm);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-dark);
+  flex-wrap: wrap;
+}
+
+.switch-district-btn {
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: opacity 0.2s;
+}
+
+.switch-district-btn:hover {
+  opacity: 0.9;
+}
+

@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+:root {
+  /* Government-style Formal Palette */
+  --primary: #1e3a8a; /* Deep Navy Blue */
+  --primary-light: #2563eb; /* Royal Blue */
+  --primary-dark: #172554; /* Darker Navy */
+  
+  --accent: #ea580c; /* Saffron / Deep Orange */
+  --accent-light: #f97316;
+  
+  --success: #15803d; /* Formal Green */
+  
+  --bg-color: #f3f4f6; /* Light Gray Background */
+  --card-bg: #ffffff;
+  
+  --text-dark: #111827; /* Near Black */
+  --text-light: #4b5563; /* Gray 600 */
+  --border-color: #d1d5db; /* Gray 300 */
+  
+  --admin-primary: #1f2937; /* Dark Gray */
+  --admin-bg: #f9fafb;
+  
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-dark);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 100vh;
+  background-image: url('./assets/logo.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 80% auto;
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all 0.2s ease-in-out;
+}
+
+input, textarea {
+  font-family: inherit;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+/* Common Gov Bar at Top */
+.gov-bar {
+  background-color: var(--text-dark);
+  color: white;
+  padding: 0.25rem 1.5rem;
+  font-size: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Global Responsive Utilities */
+@media (max-width: 768px) {
+  :root {
+    --border-radius-lg: 8px;
+  }
+  
+  html {
+    font-size: 14px; /* Slightly smaller base font for mobile */
+  }
+
+  /* Responsive Grid Helpers */
+  .grid-mobile-stack {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .flex-mobile-stack {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  /* Adjust Watermark for mobile */
+  body::before {
+    background-size: 95% auto;
+  }
+}

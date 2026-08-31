@@ -1,0 +1,320 @@
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-color);
+  background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.login-container.dark-theme {
+  --bg-color: #111827;
+  --text-dark: #f9fafb;
+  --text-light: #9ca3af;
+  --card-bg: #1f2937;
+  --border-color: #374151;
+  --primary: #ffffff;
+  --primary-light: #ffffff;
+}
+
+/* Header & Role Dropdown */
+.login-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem; /* Reduced padding to push it left */
+  gap: 1rem; /* Gap between name/logo and profession selector */
+  background: #1e3a8a; /* Deep Navy Blue */
+  color: white;
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+  border-bottom: 4px solid var(--accent);
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-icon {
+  width: 45px;
+  height: 45px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-size: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.5px;
+}
+
+.role-selector {
+  position: relative;
+}
+
+.role-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--border-radius-sm);
+  font-weight: 500;
+  color: white;
+}
+
+.role-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.role-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-sm);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+  width: 240px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.role-item {
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: var(--text-dark);
+}
+
+.role-item:hover, .role-item.active {
+  background: var(--bg-color);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* Main Content */
+.login-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md);
+  padding: 2.5rem;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+  border-top: 5px solid var(--primary); /* Formal structural top border */
+  position: relative;
+  z-index: 10;
+}
+
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.login-container.dark-theme .login-title {
+  color: white;
+}
+
+.login-subtitle {
+  color: var(--text-light);
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.form-label.optional {
+  color: var(--text-light);
+  font-weight: 400;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+  transition: all 0.2s;
+  background: var(--bg-color);
+  color: var(--text-dark);
+}
+
+.form-input:focus {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+  outline: none;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 0.875rem;
+  background: var(--accent);
+  color: white;
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  text-transform: uppercase;
+}
+
+.primary-btn:hover {
+  background: var(--accent-light);
+}
+
+.primary-btn:disabled {
+  background: var(--border-color);
+  color: var(--text-light);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* OTP Section */
+.otp-section {
+  background: var(--bg-color);
+  padding: 1.5rem;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+}
+
+/* Admin Block */
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 2rem 0;
+  color: var(--text-light);
+  font-size: 0.875rem;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.divider::before { margin-right: .75em; }
+.divider::after { margin-left: .75em; }
+
+.admin-block {
+  background: var(--admin-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--admin-primary);
+  font-weight: 600;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.admin-input:focus {
+  border-color: var(--admin-primary);
+  box-shadow: inset 0 0 0 1px var(--admin-primary);
+}
+
+.admin-btn {
+  background: var(--admin-primary);
+}
+
+.admin-btn:hover {
+  background: #111827;
+}
+
+/* Auth Buttons */
+.auth-switch-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-dark);
+  font-weight: 500;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.auth-switch-btn:hover {
+  background: var(--bg-color);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .login-header {
+    padding: 0.5rem;
+    gap: 0.25rem;
+  }
+  .login-header > div:last-child {
+    gap: 0.5rem !important;
+  }
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .logo-text {
+    font-size: 1rem;
+    letter-spacing: 0;
+  }
+  .hide-mobile-text {
+    font-size: 0.8rem;
+  }
+  .role-btn {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+  }
+  .role-btn span:last-child {
+    margin-left: 0 !important;
+  }
+}
