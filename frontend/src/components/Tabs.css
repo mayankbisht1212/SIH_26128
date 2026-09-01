@@ -2,10 +2,11 @@
 .tab-container {
   width: 100%;
   min-height: 100%;
-  height: 100%;
   box-sizing: border-box;
   padding: 1.5rem;
   padding-bottom: 2rem;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* My Herd Styles */
@@ -88,9 +89,17 @@
   color: white;
 }
 
-.advisory-icon.alert-icon { background: #ef4444; }
-.advisory-icon.weather-icon { background: var(--primary); }
-.advisory-icon.scheme-icon { background: var(--success); }
+.advisory-icon.alert-icon {
+  background: #ef4444;
+}
+
+.advisory-icon.weather-icon {
+  background: var(--primary);
+}
+
+.advisory-icon.scheme-icon {
+  background: var(--success);
+}
 
 .advisory-content {
   padding: 1.25rem;
@@ -123,31 +132,36 @@
 
 .mock-map-overlay {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.4),
-    rgba(255, 255, 255, 0.4) 10px,
-    rgba(255, 255, 255, 0.6) 10px,
-    rgba(255, 255, 255, 0.6) 20px
-  );
+  background: repeating-linear-gradient(45deg,
+      rgba(255, 255, 255, 0.4),
+      rgba(255, 255, 255, 0.4) 10px,
+      rgba(255, 255, 255, 0.6) 10px,
+      rgba(255, 255, 255, 0.6) 20px);
 }
 
 .map-markers {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 .marker {
   position: absolute;
-  width: 16px; height: 16px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 2px solid white;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 .marker.high-risk {
@@ -160,9 +174,20 @@
 }
 
 /* Hardcoded mock positions */
-.marker:nth-child(1) { top: 30%; left: 40%; }
-.marker:nth-child(2) { top: 50%; left: 60%; }
-.marker:nth-child(3) { top: 70%; left: 30%; }
+.marker:nth-child(1) {
+  top: 30%;
+  left: 40%;
+}
+
+.marker:nth-child(2) {
+  top: 50%;
+  left: 60%;
+}
+
+.marker:nth-child(3) {
+  top: 70%;
+  left: 30%;
+}
 
 .stats-grid {
   display: grid;
@@ -222,7 +247,8 @@
 }
 
 .legend-color {
-  width: 12px; height: 12px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
 }
 
@@ -298,15 +324,24 @@
   margin-top: 0.25rem;
 }
 
-.kpi-subtext.positive { color: var(--success); }
-.kpi-subtext.negative { color: #dc2626; }
-.kpi-subtext.neutral { color: var(--text-light); }
+.kpi-subtext.positive {
+  color: var(--success);
+}
+
+.kpi-subtext.negative {
+  color: #dc2626;
+}
+
+.kpi-subtext.neutral {
+  color: var(--text-light);
+}
 
 .leaflet-container {
   height: 300px;
   width: 100%;
   border-radius: var(--border-radius-sm);
-  z-index: 1; /* Keep it below modals */
+  z-index: 1;
+  /* Keep it below modals */
 }
 
 @media (min-width: 768px) {
@@ -366,9 +401,17 @@
 }
 
 @keyframes pulsing {
-  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
 }
 
 /* User Location Glowing Radar Beacon */
@@ -412,10 +455,12 @@
     transform: scale(0.6);
     opacity: 1;
   }
+
   70% {
     transform: scale(2.4);
     opacity: 0.15;
   }
+
   100% {
     transform: scale(2.8);
     opacity: 0;
@@ -516,9 +561,20 @@
 }
 
 @keyframes gps-ping {
-  0% { transform: scale(0.8); opacity: 1; }
-  50% { transform: scale(1.3); opacity: 0.6; }
-  100% { transform: scale(0.8); opacity: 1; }
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.3);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
 }
 
 .proximity-banner {
@@ -585,7 +641,7 @@
   height: 18px;
   border-radius: 50%;
   border: 2px solid #ffffff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   transition: transform 0.2s ease;
 }
@@ -698,4 +754,3 @@
 .switch-district-btn:hover {
   opacity: 0.9;
 }
-

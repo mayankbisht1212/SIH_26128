@@ -1,70 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Select from 'react-select';
 import { useLanguage } from '../i18n/LanguageContext';
-import { 
-  Flame, MapPin, Navigation, Crosshair, RefreshCw, Locate, 
-  AlertTriangle, ShieldCheck, ShieldAlert, Layers, Download, 
-  Filter, Calendar, Activity, CheckCircle2, ArrowRight
+import {
+  Flame, MapPin, Navigation, Crosshair, RefreshCw, Locate,
+  AlertTriangle, Download, Layers,
+  Filter, Calendar, ArrowRight
 } from 'lucide-react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import './Tabs.css';
 import {
-  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
   BarChart, Bar
 } from 'recharts';
 
-// Fix Leaflet default icon image paths in bundler environments
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
-
-// Custom Map Marker for Outbreak Epicenter (Red Pulsing Dot)
-const createPulseIcon = () => {
-  return L.divIcon({
-    className: 'custom-div-icon',
-    html: "<div class='pulse-marker'></div>",
-    iconSize: [24, 24],
-    iconAnchor: [12, 12]
-  });
-};
-
-// Custom Map Marker for User Current Location (Blue Radar Pulse Dot)
-const createUserPulseIcon = () => {
-  return L.divIcon({
-    className: 'user-custom-div-icon',
-    html: `
-      <div class="user-pulse-marker">
-        <div class="user-pulse-radar"></div>
-        <div class="user-pulse-dot"></div>
-      </div>
-    `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
-  });
-};
-
-// Custom Marker for Secondary Regional District Nodes
-const createDistrictNodeIcon = (severity: 'danger' | 'warning' | 'safe') => {
-  return L.divIcon({
-    className: 'custom-div-icon',
-    html: `<div class="district-node-marker ${severity}"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    popupAnchor: [0, -10]
-  });
-};
-
-const pulseIcon = createPulseIcon();
-const userPulseIcon = createUserPulseIcon();
-const dangerNodeIcon = createDistrictNodeIcon('danger');
-const warningNodeIcon = createDistrictNodeIcon('warning');
-const safeNodeIcon = createDistrictNodeIcon('safe');
 
 // Haversine distance calculator in kilometers
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -74,9 +22,9 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c * 10) / 10;
 };
@@ -99,322 +47,98 @@ function TrendsMap({
   userLocation,
   viewMode,
   currentDistanceKm,
-  timeRange,
   onSelectDistrict
 }: TrendsMapProps) {
-  const [mapEngine, setMapEngine] = useState<'svg' | 'leaflet'>('svg');
-  const [activeHoverNode, setActiveHoverNode] = useState<DistrictData | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
+  const [showNodes, setShowNodes] = useState(true);
 
-  // Leaflet initialization effect (active when mapEngine === 'leaflet')
-  useEffect(() => {
-    if (mapEngine !== 'leaflet' || !mapContainerRef.current) return;
+  // Determine focus center based on view mode
+  const focusLat = viewMode === 'user' && userLocation
+    ? userLocation.lat
+    : selectedDistrict.center[0];
+  const focusLng = viewMode === 'user' && userLocation
+    ? userLocation.lng
+    : selectedDistrict.center[1];
 
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.remove();
-      mapInstanceRef.current = null;
-    }
-
-    try {
-      const map = L.map(mapContainerRef.current, {
-        center: selectedDistrict.center,
-        zoom: 8,
-        scrollWheelZoom: false,
-        zoomControl: true
-      });
-
-      mapInstanceRef.current = map;
-
-      const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 19
-      });
-
-      tileLayer.on('tileerror', () => {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
-      });
-
-      tileLayer.addTo(map);
-
-      // Render secondary node markers
-      stateDistricts.forEach((d) => {
-        if (d.value === selectedDistrict.value) return;
-        const severity = d.kpi.clusters > 5 ? 'danger' : d.kpi.clusters > 2 ? 'warning' : 'safe';
-        const icon = severity === 'danger' ? dangerNodeIcon : severity === 'warning' ? warningNodeIcon : safeNodeIcon;
-        const marker = L.marker(d.center, { icon }).addTo(map);
-
-        const div = document.createElement('div');
-        div.className = 'map-popup-card';
-        div.innerHTML = `
-          <h4>📍 ${d.label} Node</h4>
-          <div><strong>Clusters:</strong> ${d.kpi.clusters}</div>
-          <div><strong>Reports:</strong> ${d.kpi.reports}</div>
-          <div><strong>Vax Rate:</strong> ${d.kpi.vax}%</div>
-        `;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = 'Focus District';
-        btn.style.cssText = 'margin-top:0.4rem;padding:0.25rem 0.5rem;background:#1e3a8a;color:white;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;width:100%;font-weight:600;';
-        btn.onclick = () => onSelectDistrict(d);
-        div.appendChild(btn);
-        marker.bindPopup(div);
-      });
-
-      // Primary epicenter
-      const primary = L.marker(selectedDistrict.center, { icon: pulseIcon }).addTo(map);
-      primary.bindPopup(`
-        <div class="map-popup-card">
-          <h4>🔴 ${selectedDistrict.label} Epicenter</h4>
-          <div><strong>State:</strong> ${selectedState.label}</div>
-          <div><strong>Clusters:</strong> ${selectedDistrict.kpi.clusters}</div>
-          <div><strong>Reports:</strong> ${selectedDistrict.kpi.reports}</div>
-          <div><strong>Vax:</strong> ${selectedDistrict.kpi.vax}%</div>
-        </div>
-      `);
-
-      // User location
-      if (userLocation) {
-        const uMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userPulseIcon }).addTo(map);
-        uMarker.bindPopup(`
-          <div class="map-popup-card">
-            <h4>🔵 Your Location</h4>
-            <div>${userLocation.placeName || 'GPS Beacon'}</div>
-          </div>
-        `);
-
-        L.polyline([[userLocation.lat, userLocation.lng], selectedDistrict.center], {
-          color: '#ef4444', weight: 2, dashArray: '6,6'
-        }).addTo(map);
-      }
-
-      if (viewMode === 'user' && userLocation) map.setView([userLocation.lat, userLocation.lng], 12);
-      else if (viewMode === 'both' && userLocation) map.fitBounds([[userLocation.lat, userLocation.lng], selectedDistrict.center], { padding: [45, 45] });
-      else map.setView(selectedDistrict.center, 8);
-
-      setTimeout(() => { try { map.invalidateSize(); } catch {} }, 150);
-    } catch (e) {
-      console.warn('Leaflet map init warning, switching to vector GIS radar:', e);
-      setMapEngine('svg');
-    }
-
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
-  }, [mapEngine, selectedDistrict, selectedState, stateDistricts, userLocation, viewMode, currentDistanceKm, timeRange]);
-
-  // SVG Vector Projection math for deterministic, 100% visible vector GIS canvas
-  const allPoints = [...stateDistricts.map(d => d.center), ...(userLocation ? [[userLocation.lat, userLocation.lng] as [number, number]] : [])];
-  const lats = allPoints.map(p => p[0]);
-  const lngs = allPoints.map(p => p[1]);
-
-  const minLat = Math.min(...lats) - 0.4;
-  const maxLat = Math.max(...lats) + 0.4;
-  const minLng = Math.min(...lngs) - 0.6;
-  const maxLng = Math.max(...lngs) + 0.6;
-
-  const toSvgX = (lng: number) => 60 + ((lng - minLng) / (maxLng - minLng || 1)) * 680;
-  const toSvgY = (lat: number) => 380 - ((lat - minLat) / (maxLat - minLat || 1)) * 300;
-
-  const primaryX = toSvgX(selectedDistrict.center[1]);
-  const primaryY = toSvgY(selectedDistrict.center[0]);
-
-  const userX = userLocation ? toSvgX(userLocation.lng) : null;
-  const userY = userLocation ? toSvgY(userLocation.lat) : null;
+  // Build the OpenStreetMap embed URL (no API key, always works)
+  const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${focusLng - 1.5}%2C${focusLat - 1.2}%2C${focusLng + 1.5}%2C${focusLat + 1.2}&layer=mapnik&marker=${focusLat}%2C${focusLng}`;
 
   return (
-    <div style={{ position: 'relative', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', background: '#0f172a' }}>
-      
-      {/* Map Engine Selector Header */}
-      <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 20, display: 'flex', gap: '0.4rem', background: 'rgba(15, 23, 42, 0.85)', padding: '4px', borderRadius: '8px', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
-        <button
-          type="button"
-          onClick={() => setMapEngine('svg')}
-          style={{
-            padding: '0.35rem 0.75rem',
-            borderRadius: '6px',
-            fontSize: '0.75rem',
-            fontWeight: '700',
-            background: mapEngine === 'svg' ? '#2563eb' : 'transparent',
-            color: 'white',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          📡 Tactical GIS Radar
-        </button>
-        <button
-          type="button"
-          onClick={() => setMapEngine('leaflet')}
-          style={{
-            padding: '0.35rem 0.75rem',
-            borderRadius: '6px',
-            fontSize: '0.75rem',
-            fontWeight: '700',
-            background: mapEngine === 'leaflet' ? '#2563eb' : 'transparent',
-            color: 'white',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          🗺️ Street Tiles
-        </button>
+    <div style={{ position: 'relative', width: '100%', minHeight: '440px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', background: '#0f172a' }}>
+
+      {/* OSM Iframe - guaranteed to always render */}
+      <iframe
+        key={`${focusLat.toFixed(4)}-${focusLng.toFixed(4)}`}
+        src={osmEmbedUrl}
+        title="Disease Surveillance Map"
+        style={{ display: 'block', width: '100%', height: '440px', border: 'none' }}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+      />
+
+      {/* Floating info panel - top left */}
+      <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 20, background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '0.75rem 1rem', color: 'white', minWidth: '200px', maxWidth: '250px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', display: 'inline-block', flexShrink: 0, boxShadow: '0 0 0 3px rgba(239,68,68,0.3)' }} />
+          <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#f8fafc', lineHeight: 1.2 }}>
+            {selectedDistrict.label}
+          </span>
+        </div>
+        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.12rem' }}>State: <strong style={{ color: '#38bdf8' }}>{selectedState.label}</strong></div>
+        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.12rem' }}>Clusters: <strong style={{ color: selectedDistrict.kpi.clusters > 5 ? '#ef4444' : '#f59e0b' }}>{selectedDistrict.kpi.clusters}</strong></div>
+        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.12rem' }}>Reports: <strong style={{ color: '#f8fafc' }}>{selectedDistrict.kpi.reports}</strong></div>
+        <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Vax: <strong style={{ color: selectedDistrict.kpi.vaxStatus === 'positive' ? '#10b981' : '#ef4444' }}>{selectedDistrict.kpi.vax}%</strong></div>
+        {userLocation && currentDistanceKm !== null && (
+          <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.72rem', color: '#94a3b8' }}>
+            Distance from you: <strong style={{ color: '#38bdf8' }}>{currentDistanceKm} km</strong>
+          </div>
+        )}
+        <div style={{ marginTop: '0.35rem', fontSize: '0.64rem', color: '#475569', fontFamily: 'monospace' }}>
+          {selectedDistrict.center[0].toFixed(4)}°N, {selectedDistrict.center[1].toFixed(4)}°E
+        </div>
       </div>
 
-      {mapEngine === 'leaflet' ? (
-        <div ref={mapContainerRef} className="leaflet-container" style={{ height: '440px', width: '100%', borderRadius: '12px' }} />
-      ) : (
-        <div style={{ position: 'relative', width: '100%', height: '440px', background: 'radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%)', overflow: 'hidden' }}>
-          
-          {/* Tactical Vector GIS Canvas SVG */}
-          <svg viewBox="0 0 800 440" style={{ width: '100%', height: '100%', display: 'block' }}>
-            <defs>
-              {/* Radar Grid Pattern */}
-              <pattern id="radarGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(51, 65, 85, 0.4)" strokeWidth="0.5" />
-              </pattern>
-              
-              {/* Pulsing Aura Gradients */}
-              <radialGradient id="outbreakPulse" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
-                <stop offset="60%" stopColor="#ef4444" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
-              </radialGradient>
-              
-              <radialGradient id="userPulse" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.9" />
-                <stop offset="70%" stopColor="#3b82f6" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-              </radialGradient>
-            </defs>
+      {/* Toggle nodes button - top right */}
+      <button
+        type="button"
+        onClick={() => setShowNodes(v => !v)}
+        style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 20, padding: '0.4rem 0.75rem', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '700', background: 'rgba(15,23,42,0.92)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', backdropFilter: 'blur(8px)' }}
+      >
+        {showNodes ? '▲ Hide Nodes' : '▼ District Nodes'}
+      </button>
 
-            {/* Grid Overlay */}
-            <rect width="800" height="440" fill="url(#radarGrid)" />
-
-            {/* Coordinate Grid Labels */}
-            <text x="16" y="24" fill="#64748b" fontSize="10" fontFamily="monospace">LAT: {selectedDistrict.center[0]}° N</text>
-            <text x="16" y="40" fill="#64748b" fontSize="10" fontFamily="monospace">LON: {selectedDistrict.center[1]}° E</text>
-            <text x="16" y="56" fill="#38bdf8" fontSize="10" fontWeight="700">REGION: {selectedState.label}</text>
-
-            {/* Concentric Sector Rings around Epicenter */}
-            <circle cx={primaryX} cy={primaryY} r="45" fill="none" stroke="rgba(239, 68, 68, 0.3)" strokeWidth="1" strokeDasharray="4 4" />
-            <circle cx={primaryX} cy={primaryY} r="95" fill="none" stroke="rgba(239, 68, 68, 0.2)" strokeWidth="1" strokeDasharray="5 5" />
-            <circle cx={primaryX} cy={primaryY} r="150" fill="none" stroke="rgba(239, 68, 68, 0.12)" strokeWidth="1" strokeDasharray="6 6" />
-
-            {/* Connecting Distance Trajectory Polyline */}
-            {userX !== null && userY !== null && (
-              <>
-                <line 
-                  x1={userX} y1={userY} 
-                  x2={primaryX} y2={primaryY} 
-                  stroke="#ef4444" 
-                  strokeWidth="2" 
-                  strokeDasharray="6 4"
-                  opacity="0.85" 
-                />
-                
-                {/* Midpoint Trajectory Distance Badge */}
-                <g transform={`translate(${(userX + primaryX)/2}, ${(userY + primaryY)/2 - 10})`}>
-                  <rect x="-50" y="-12" width="100" height="22" rx="4" fill="#1e293b" stroke="#334155" strokeWidth="1" />
-                  <text x="0" y="3" fill="#38bdf8" fontSize="10" fontWeight="700" textAnchor="middle">
-                    {currentDistanceKm} km trajectory
-                  </text>
-                </g>
-              </>
-            )}
-
-            {/* Secondary Regional State District Node Pins */}
-            {stateDistricts.map((d) => {
-              if (d.value === selectedDistrict.value) return null;
-              const nx = toSvgX(d.center[1]);
-              const ny = toSvgY(d.center[0]);
-              const nodeColor = d.kpi.clusters > 5 ? '#ef4444' : d.kpi.clusters > 2 ? '#f59e0b' : '#10b981';
-
-              return (
-                <g 
-                  key={d.value} 
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => onSelectDistrict(d)}
-                  onMouseEnter={() => setActiveHoverNode(d)}
-                  onMouseLeave={() => setActiveHoverNode(null)}
-                >
-                  <circle cx={nx} cy={ny} r="14" fill={nodeColor} opacity="0.25" />
-                  <circle cx={nx} cy={ny} r="6" fill={nodeColor} stroke="#ffffff" strokeWidth="1.5" />
-                  <text x={nx} y={ny + 18} fill="#cbd5e1" fontSize="10" fontWeight="600" textAnchor="middle">
-                    {d.label}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Primary District Epicenter Marker */}
-            <g transform={`translate(${primaryX}, ${primaryY})`}>
-              <circle r="36" fill="url(#outbreakPulse)" />
-              <circle r="12" fill="#ef4444" opacity="0.9" />
-              <circle r="5" fill="#ffffff" />
-              
-              {/* Epicenter Label Tag */}
-              <g transform="translate(0, -22)">
-                <rect x="-70" y="-12" width="140" height="20" rx="4" fill="#dc2626" />
-                <text x="0" y="2" fill="#ffffff" fontSize="10" fontWeight="800" textAnchor="middle">
-                  🔴 {selectedDistrict.label} Epicenter
-                </text>
-              </g>
-            </g>
-
-            {/* Live User Location Beacon */}
-            {userX !== null && userY !== null && userLocation && (
-              <g transform={`translate(${userX}, ${userY})`}>
-                <circle r="30" fill="url(#userPulse)" />
-                <circle r="10" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-                <circle r="4" fill="#ffffff" />
-                
-                {/* User Location Label Tag */}
-                <g transform="translate(0, 24)">
-                  <rect x="-60" y="-10" width="120" height="18" rx="4" fill="#1d4ed8" />
-                  <text x="0" y="3" fill="#ffffff" fontSize="9" fontWeight="800" textAnchor="middle">
-                    🔵 Your Location
-                  </text>
-                </g>
-              </g>
-            )}
-
-            {/* Map Legend Overlay */}
-            <g transform="translate(16, 384)">
-              <rect width="370" height="42" rx="6" fill="rgba(15, 23, 42, 0.9)" stroke="rgba(255,255,255,0.15)" />
-              <circle cx="20" cy="21" r="5" fill="#ef4444" />
-              <text x="32" y="25" fill="#f8fafc" fontSize="10" fontWeight="600">Outbreak Epicenter</text>
-              
-              <circle cx="145" cy="21" r="5" fill="#2563eb" />
-              <text x="157" y="25" fill="#f8fafc" fontSize="10" fontWeight="600">Your GPS Beacon</text>
-
-              <circle cx="265" cy="21" r="4" fill="#10b981" />
-              <text x="277" y="25" fill="#f8fafc" fontSize="10" fontWeight="600">Monitored Node</text>
-            </g>
-          </svg>
-
-          {/* Hover Card Overlay */}
-          {activeHoverNode && (
-            <div style={{ position: 'absolute', bottom: '16px', right: '16px', background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', padding: '0.75rem 1rem', color: 'white', zIndex: 30, boxShadow: '0 10px 25px rgba(0,0,0,0.5)', minWidth: '180px' }}>
-              <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#38bdf8', marginBottom: '0.25rem' }}>📍 {activeHoverNode.label}</div>
-              <div style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>State: {selectedState.label}</div>
-              <div style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Clusters: {activeHoverNode.kpi.clusters}</div>
-              <div style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Reports: {activeHoverNode.kpi.reports}</div>
-              <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '700', marginTop: '0.25rem' }}>Click node to switch view</div>
-            </div>
-          )}
-
+      {/* District node list - bottom right */}
+      {showNodes && stateDistricts.length > 1 && (
+        <div style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 20, background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '0.6rem', maxHeight: '200px', overflowY: 'auto', minWidth: '190px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+          <div style={{ fontSize: '0.65rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
+            Monitored Districts
+          </div>
+          {stateDistricts.map((d) => {
+            const isActive = d.value === selectedDistrict.value;
+            const color = d.kpi.clusters > 5 ? '#ef4444' : d.kpi.clusters > 2 ? '#f59e0b' : '#10b981';
+            return (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => onSelectDistrict(d)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', padding: '0.3rem 0.4rem', background: isActive ? 'rgba(37,99,235,0.3)' : 'transparent', border: isActive ? '1px solid rgba(59,130,246,0.5)' : '1px solid transparent', borderRadius: '6px', cursor: 'pointer', marginBottom: '0.2rem', textAlign: 'left' }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: '0.72rem', color: isActive ? '#93c5fd' : '#cbd5e1', fontWeight: isActive ? '700' : '400', lineHeight: 1.2 }}>{d.label}</span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color, fontWeight: '700' }}>{d.kpi.clusters}</span>
+              </button>
+            );
+          })}
         </div>
       )}
+
+      {/* OSM credit */}
+      <div style={{ position: 'absolute', bottom: '12px', left: '12px', zIndex: 20, background: 'rgba(15,23,42,0.8)', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.62rem', color: '#64748b' }}>
+        Map data © OpenStreetMap contributors
+      </div>
     </div>
   );
 }
+
 
 export interface DistrictData {
   value: string;
@@ -706,9 +430,9 @@ const generateDynamicChartData = (reports: number, diseaseFilter: string, timeRa
 
 // Custom styles for react-select to support light/dark modes
 const selectStyles = {
-  control: (base: any) => ({ 
-    ...base, 
-    fontSize: '0.85rem', 
+  control: (base: any) => ({
+    ...base,
+    fontSize: '0.85rem',
     backgroundColor: 'var(--card-bg)',
     borderColor: 'var(--border-color)',
   }),
@@ -731,7 +455,7 @@ const selectStyles = {
 
 export default function Trends() {
   const { t } = useLanguage();
-  
+
   // State and District Selection
   const [selectedState, setSelectedState] = useState(stateOptions.find(s => s.value === 'GJ') || stateOptions[0]);
   const [selectedDistrict, setSelectedDistrict] = useState<DistrictData>(districtOptionsMap['GJ'][0]);
@@ -801,7 +525,7 @@ export default function Trends() {
         if (error.code === 1) msg = 'Location permission denied.';
         else if (error.code === 2) msg = 'Location position unavailable.';
         else if (error.code === 3) msg = 'Location request timed out.';
-        
+
         setLocationStatus('error');
         setLocationError(msg);
       },
@@ -952,7 +676,7 @@ export default function Trends() {
               Real-time zoonotic disease outbreak tracking across 36 Indian States & Union Territories
             </p>
           </div>
-          
+
           <button
             type="button"
             className="map-action-btn"
@@ -963,7 +687,7 @@ export default function Trends() {
             <Download size={14} /> Export Report (CSV)
           </button>
         </div>
-        
+
         {/* State & District Selectors */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
           <div>
@@ -1049,7 +773,7 @@ export default function Trends() {
           </button>
         </div>
       )}
-      
+
       {/* 1. Critical Alert Banner */}
       <div className="critical-alert-banner" style={{ background: selectedDistrict.kpi.clusters > 5 ? '#dc2626' : '#f59e0b' }}>
         <div className="critical-icon">
@@ -1204,7 +928,7 @@ export default function Trends() {
 
       {/* 4. Charts Grid */}
       <div className="chart-grid">
-        
+
         {/* Line / Area Chart */}
         <div className="chart-card">
           <div className="chart-title">Disease Incidence Trend ({timeRange})</div>
@@ -1213,12 +937,12 @@ export default function Trends() {
               <AreaChart data={dynamicCharts.incidence} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorLsd" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorFmd" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -1285,7 +1009,7 @@ export default function Trends() {
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" domain={[0, 100]} style={{ fontSize: '0.75rem' }} />
                 <YAxis dataKey="name" type="category" style={{ fontSize: '0.75rem' }} width={85} />
-                <RechartsTooltip cursor={{fill: 'transparent'}} />
+                <RechartsTooltip cursor={{ fill: 'transparent' }} />
                 <Bar dataKey="rate" name="Vaccinated %" fill="#10b981" barSize={20} radius={[0, 4, 4, 0]}>
                   {vaccinationData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.rate > 80 ? '#10b981' : entry.rate > 60 ? '#f59e0b' : '#ef4444'} />

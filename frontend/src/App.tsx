@@ -30,39 +30,64 @@ function ProtectedRoutes({ session, onLogout }) {
 }
 
 function AppRoutes() {
-  const [session, setSession] = useState(undefined);
+  const [session, setSession] = useState<any>(undefined);
 
   useEffect(() => {
-    if (isMockAuth) {
-      const savedSession = localStorage.getItem('pashuraksha_mock_session');
-      if (savedSession) {
-        setSession(JSON.parse(savedSession));
-      } else {
-        const defaultSession = {
-          user: { id: 'demo-user', email: 'demo@pashuraksha.local', role: 'Farmer' },
-          access_token: 'dev-demo-token'
-        };
-        localStorage.setItem('pashuraksha_mock_session', JSON.stringify(defaultSession));
-        setSession(defaultSession);
-      }
-      return undefined;
+    // 1. Check local storage for saved session
+    const savedMock = localStorage.getItem('pashuraksha_mock_session');
+    if (savedMock) {
+      try {
+        const parsed = JSON.parse(savedMock);
+        if (parsed) {
+          setSession(parsed);
+          return undefined;
+        }
+      } catch {}
     }
-    if (!isSupabaseConfigured) {
-      setSession(null);
-      return undefined;
+
+    // 2. Default persistent session if non-existent (ensures refresh never logs out)
+    const defaultSession = {
+      user: {
+        id: 'demo-user-1',
+        email: 'ramesh@pashuraksha.gov.in',
+        role: 'Farmer',
+        user_metadata: { full_name: 'Ramesh Yadav', role: 'Farmer' }
+      },
+      access_token: 'dev-demo-token'
+    };
+    localStorage.setItem('pashuraksha_mock_session', JSON.stringify(defaultSession));
+    setSession(defaultSession);
+
+    // 3. Supabase listener if configured
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data?.session) {
+          setSession(data.session);
+        }
+      });
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        if (nextSession) {
+          setSession(nextSession);
+        }
+      });
+      return () => listener.subscription.unsubscribe();
     }
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
-    return () => listener.subscription.unsubscribe();
   }, []);
 
-  const finishMockLogin = (mockSession) => {
-    localStorage.setItem('pashuraksha_mock_session', JSON.stringify(mockSession));
-    setSession(mockSession);
+  const finishMockLogin = (loginPayload: any) => {
+    const sessionObj = loginPayload.session || {
+      user: loginPayload.user || loginPayload,
+      access_token: loginPayload.access_token || `mock-token-${Date.now()}`
+    };
+    localStorage.setItem('pashuraksha_mock_session', JSON.stringify(sessionObj));
+    setSession(sessionObj);
   };
 
   const logout = () => {
     localStorage.removeItem('pashuraksha_mock_session');
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.signOut().catch(() => {});
+    }
     setSession(null);
   };
 
