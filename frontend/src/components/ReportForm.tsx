@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Image as ImageIcon, Mic, Square, ArrowRight, X, MapPin, AlertOctagon, CheckCircle2, Clock, ChevronRight, Activity } from 'lucide-react';
 import './ReportForm.css';
@@ -12,7 +12,22 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
   const [image, setImage] = useState(initialImage || null);
   const [symptoms, setSymptoms] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [audioURL, setAudioURL] = useState(null);
+  const [audioURL, setAudioURL] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [micError, setMicError] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    };
+  }, []);
   
   // Step 3 State
   const [species, setSpecies] = useState('');
@@ -140,14 +155,83 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
     );
   };
 
-  const toggleRecording = () => {
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  const toggleRecording = async () => {
+    setMicError(null);
+
     if (isRecording) {
+      // --- STOP RECORDING ---
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       setIsRecording(false);
-      setAudioURL("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"); // Mock audio
     } else {
-      setIsRecording(true);
+      // --- START RECORDING: request mic permission ---
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setMicError('Microphone not supported on this browser.');
+        return;
+      }
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setMicError('Microphone permission denied. Please allow mic access in your browser settings.');
+        } else if (err.name === 'NotFoundError') {
+          setMicError('No microphone found on this device.');
+        } else {
+          setMicError('Could not access microphone: ' + err.message);
+        }
+        return;
+      }
+
+      streamRef.current = stream;
+      audioChunksRef.current = [];
       setAudioURL(null);
+      setRecordingSeconds(0);
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        setAudioURL(url);
+        // Stop all mic tracks
+        stream.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      };
+
+      recorder.start(100); // collect chunks every 100ms
+      setIsRecording(true);
+
+      // Start live timer
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
     }
+  };
+
+  const deleteRecording = () => {
+    if (audioURL) URL.revokeObjectURL(audioURL);
+    setAudioURL(null);
+    setRecordingSeconds(0);
   };
 
   return (
@@ -176,24 +260,57 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
             <p className="step-subtitle">{t('recordHint')}</p>
             
             <div className="voice-record-area">
-              <button 
+              {/* Mic permission error */}
+              {micError && (
+                <div style={{ width: '100%', marginBottom: '0.75rem', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '0.6rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <X size={15} color="#dc2626" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: '600' }}>{micError}</span>
+                </div>
+              )}
+
+              <button
                 className={`mic-btn ${isRecording ? 'recording' : ''}`}
                 onClick={toggleRecording}
               >
                 <span className="mic-icon">{isRecording ? <Square size={32} /> : <Mic size={32} />}</span>
               </button>
+
+              {/* Live recording timer */}
+              {isRecording && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', display: 'inline-block', animation: 'pulse 1s infinite' }} />
+                  <span style={{ fontSize: '1.1rem', fontWeight: '700', color: '#ef4444', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                    {formatTime(recordingSeconds)}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Recording…</span>
+                </div>
+              )}
+
               <p className="mic-text">
                 {isRecording ? t('recordingStop') : t('tapToRecord')}
               </p>
-              {audioURL && (
-                <div style={{ marginTop: '1rem', width: '100%' }}>
-                  <audio src={audioURL} controls style={{ width: '100%', height: '40px' }} />
-                  <button type="button" onClick={() => setAudioURL(null)} style={{ marginTop: '0.5rem', background: 'transparent', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>
-                    <X size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Delete Recording
+
+              {/* Real recorded audio playback */}
+              {audioURL && !isRecording && (
+                <div style={{ marginTop: '1rem', width: '100%', background: 'var(--bg-color)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <Mic size={15} color="var(--primary)" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-dark)' }}>
+                      Recorded Message · {formatTime(recordingSeconds)}
+                    </span>
+                  </div>
+                  <audio src={audioURL} controls style={{ width: '100%', height: '40px', display: 'block' }} />
+                  <button
+                    type="button"
+                    onClick={deleteRecording}
+                    style={{ marginTop: '0.5rem', background: 'transparent', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <X size={14} /> Delete Recording
                   </button>
                 </div>
               )}
             </div>
+
             
             <div className="upload-divider">{t('orType')}</div>
             
