@@ -108,7 +108,7 @@ export default function MyHerd() {
         const { data: { user } } = await client.auth.getUser();
         if (user) {
           await client.from('animals').insert({
-            owner_id: user.id, tag_id: localItem.id, species: localItem.type,
+            owner_id: user.id, _id: localItem.id, species: localItem.type,
             health_status: localItem.status, last_vaccinated_on: localItem.lastVac || null,
             vaccine_name: localItem.vaccine || null, next_vaccination_on: localItem.nextVac || null
           });

@@ -367,7 +367,7 @@ export default function Home({ children, onLogout }) {
           <div className="slide-left" style={{ position: 'fixed', top: 0, right: 0, width: '50%', minWidth: '320px', maxWidth: '400px', height: '100vh', background: 'var(--card-bg)', zIndex: 10006, boxShadow: '-5px 0 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-color)' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Bell size={20} color="var(--primary)" /> {t('notifications') || 'Notifications'}
+                <Bell size={20} color="var(--primary)" /> {t('Alerts & Advisories') || 'Alerts & Advisories'}
               </h3>
               <button onClick={() => setShowNotifications(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-light)', cursor: 'pointer' }}>
                 <X size={24} />

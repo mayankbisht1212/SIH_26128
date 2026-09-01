@@ -12,7 +12,8 @@ import {
   PieChart, Pie, Cell,
   BarChart, Bar
 } from 'recharts';
-
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 // Haversine distance calculator in kilometers
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -29,6 +30,64 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return Math.round(R * c * 10) / 10;
 };
 
+// Fix Leaflet default icon paths in bundlers
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+// Custom Outbreak Hotspot Epicenter Marker (Red Pulsing Dot with Label)
+const pulseIcon = L.divIcon({
+  className: 'custom-div-icon',
+  html: `
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+      <div class="pulse-marker"></div>
+      <div style="position:absolute;bottom:22px;background:#dc2626;color:white;font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);pointer-events:none;">
+        🔴 Outbreak Hotspot
+      </div>
+    </div>
+  `,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -18]
+});
+
+// Custom User Location Marker (Glowing Blue Radar Beacon with Label)
+const userPulseIcon = L.divIcon({
+  className: 'user-custom-div-icon',
+  html: `
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+      <div class="user-pulse-marker">
+        <div class="user-pulse-radar"></div>
+        <div class="user-pulse-dot"></div>
+      </div>
+      <div style="position:absolute;top:28px;background:#1d4ed8;color:white;font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);pointer-events:none;">
+        🔵 Your Location
+      </div>
+    </div>
+  `,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16]
+});
+
+// Custom Secondary Regional District Node Marker
+const createDistrictNodeIcon = (severity: 'danger' | 'warning' | 'safe') => {
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div class="district-node-marker ${severity}"></div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -10]
+  });
+};
+
+const dangerNodeIcon = createDistrictNodeIcon('danger');
+const warningNodeIcon = createDistrictNodeIcon('warning');
+const safeNodeIcon = createDistrictNodeIcon('safe');
+
 interface TrendsMapProps {
   selectedDistrict: DistrictData;
   selectedState: { value: string; label: string };
@@ -38,6 +97,7 @@ interface TrendsMapProps {
   currentDistanceKm: number | null;
   timeRange: string;
   onSelectDistrict: (district: DistrictData) => void;
+  onSetViewMode?: (mode: 'both' | 'user' | 'outbreak') => void;
 }
 
 function TrendsMap({
@@ -47,70 +107,296 @@ function TrendsMap({
   userLocation,
   viewMode,
   currentDistanceKm,
-  onSelectDistrict
+  onSelectDistrict,
+  onSetViewMode
 }: TrendsMapProps) {
   const [showNodes, setShowNodes] = useState(true);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
 
-  // Determine focus center based on view mode
-  const focusLat = viewMode === 'user' && userLocation
-    ? userLocation.lat
-    : selectedDistrict.center[0];
-  const focusLng = viewMode === 'user' && userLocation
-    ? userLocation.lng
-    : selectedDistrict.center[1];
+  const effectiveUserLoc = userLocation || {
+    lat: 22.5645,
+    lng: 72.9289,
+    placeName: 'My Farm Location (GPS)'
+  };
 
-  // Build the OpenStreetMap embed URL (no API key, always works)
-  const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${focusLng - 1.5}%2C${focusLat - 1.2}%2C${focusLng + 1.5}%2C${focusLat + 1.2}&layer=mapnik&marker=${focusLat}%2C${focusLng}`;
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    // Clean previous Leaflet instance if present
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+    if (mapContainerRef.current) {
+      (mapContainerRef.current as any)._leaflet_id = null;
+      mapContainerRef.current.innerHTML = '';
+    }
+
+    try {
+      const map = L.map(mapContainerRef.current, {
+        center: [effectiveUserLoc.lat, effectiveUserLoc.lng],
+        zoom: 12,
+        scrollWheelZoom: true,
+        zoomControl: true
+      });
+
+      mapInstanceRef.current = map;
+
+      // OpenStreetMap & Esri World Street Map tiles (100% Free, NO API key required)
+      const tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      });
+
+      tileLayer.on('tileerror', () => {
+        // Fallback to Esri World Street Map if OSM rate limits
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+      });
+
+      tileLayer.addTo(map);
+
+      // 1. Add User Location Marker (Always present on map)
+      const userMarker = L.marker([effectiveUserLoc.lat, effectiveUserLoc.lng], { icon: userPulseIcon }).addTo(map);
+      userMarker.bindPopup(`
+        <div style="font-family:sans-serif;min-width:160px;padding:4px;">
+          <h4 style="margin:0 0 4px 0;font-size:12px;font-weight:700;color:#1d4ed8;">🔵 Your Live Location</h4>
+          <div style="font-size:11px;color:#475569;">${effectiveUserLoc.placeName || 'Farm Location'}</div>
+          <div style="font-size:10px;color:#94a3b8;font-family:monospace;margin-top:2px;">
+            ${effectiveUserLoc.lat.toFixed(4)}°N, ${effectiveUserLoc.lng.toFixed(4)}°E
+          </div>
+        </div>
+      `);
+
+      // 2. Add Selected Outbreak Hotspot Epicenter Marker (Always present on map)
+      const hotspotMarker = L.marker(selectedDistrict.center, { icon: pulseIcon }).addTo(map);
+      hotspotMarker.bindPopup(`
+        <div style="font-family:sans-serif;min-width:180px;padding:4px;">
+          <h4 style="margin:0 0 4px 0;font-size:12px;font-weight:700;color:#dc2626;">🔴 ${selectedDistrict.label} Hotspot</h4>
+          <div style="font-size:11px;color:#475569;">State: <strong>${selectedState.label}</strong></div>
+          <div style="font-size:11px;color:#475569;">Active Clusters: <strong style="color:#dc2626;">${selectedDistrict.kpi.clusters}</strong></div>
+          <div style="font-size:11px;color:#475569;">Total Reports: <strong>${selectedDistrict.kpi.reports}</strong></div>
+          <div style="font-size:11px;color:#475569;">Vax Coverage: <strong style="color:${selectedDistrict.kpi.vaxStatus === 'positive' ? '#10b981' : '#dc2626'};">${selectedDistrict.kpi.vax}%</strong></div>
+          ${currentDistanceKm !== null ? `<div style="margin-top:4px;padding-top:4px;border-top:1px solid #e2e8f0;font-size:11px;color:#2563eb;font-weight:700;">Distance from you: ${currentDistanceKm} km</div>` : ''}
+        </div>
+      `);
+
+      // 3. Add Connecting Trajectory Polyline between User and Hotspot
+      L.polyline([[effectiveUserLoc.lat, effectiveUserLoc.lng], selectedDistrict.center], {
+        color: '#ef4444',
+        weight: 2.5,
+        dashArray: '6, 6',
+        opacity: 0.8
+      }).addTo(map);
+
+      // 4. Add Secondary Regional District Node Markers
+      stateDistricts.forEach((d) => {
+        if (d.value === selectedDistrict.value) return;
+        const severity = d.kpi.clusters > 5 ? 'danger' : d.kpi.clusters > 2 ? 'warning' : 'safe';
+        const icon = severity === 'danger' ? dangerNodeIcon : severity === 'warning' ? warningNodeIcon : safeNodeIcon;
+        const marker = L.marker(d.center, { icon }).addTo(map);
+
+        const div = document.createElement('div');
+        div.style.cssText = 'font-family:sans-serif;min-width:160px;padding:4px;';
+        div.innerHTML = `
+          <h4 style="margin:0 0 4px 0;font-size:12px;font-weight:700;color:#1e293b;">📍 ${d.label} Node</h4>
+          <div style="font-size:11px;color:#64748b;">Clusters: <strong>${d.kpi.clusters}</strong></div>
+          <div style="font-size:11px;color:#64748b;">Reports: <strong>${d.kpi.reports}</strong></div>
+          <div style="font-size:11px;color:#64748b;">Vax Rate: <strong>${d.kpi.vax}%</strong></div>
+        `;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Focus District';
+        btn.style.cssText = 'margin-top:6px;padding:4px 8px;background:#1e3a8a;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;width:100%;font-weight:700;';
+        btn.onclick = () => {
+          onSelectDistrict(d);
+          onSetViewMode?.('both');
+        };
+        div.appendChild(btn);
+        marker.bindPopup(div);
+      });
+
+      // 5. Position Map View based on View Mode
+      if (viewMode === 'user') {
+        map.setView([effectiveUserLoc.lat, effectiveUserLoc.lng], 13);
+      } else if (viewMode === 'outbreak') {
+        map.setView(selectedDistrict.center, 10);
+      } else {
+        // 'both' mode: fit bounds around BOTH the user's location and the outbreak center
+        const bounds = L.latLngBounds([
+          [effectiveUserLoc.lat, effectiveUserLoc.lng],
+          selectedDistrict.center
+        ]);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 });
+      }
+
+      // Invalidate size to ensure crisp rendering after layout
+      setTimeout(() => {
+        try {
+          map.invalidateSize();
+        } catch {}
+      }, 100);
+    } catch (e) {
+      console.warn('Leaflet map initialization notice:', e);
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [selectedDistrict, selectedState, stateDistricts, userLocation, viewMode, currentDistanceKm]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', minHeight: '440px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', background: '#0f172a' }}>
+    <div style={{ position: 'relative', width: '100%', minHeight: '480px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)', background: '#0f172a' }}>
 
-      {/* OSM Iframe - guaranteed to always render */}
-      <iframe
-        key={`${focusLat.toFixed(4)}-${focusLng.toFixed(4)}`}
-        src={osmEmbedUrl}
-        title="Disease Surveillance Map"
-        style={{ display: 'block', width: '100%', height: '440px', border: 'none' }}
-        loading="lazy"
-        referrerPolicy="no-referrer"
+      {/* Leaflet Canvas Container */}
+      <div 
+        ref={mapContainerRef} 
+        style={{ width: '100%', height: '480px', zIndex: 1 }} 
       />
 
-      {/* Floating info panel - top left */}
-      <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 20, background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '0.75rem 1rem', color: 'white', minWidth: '200px', maxWidth: '250px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', display: 'inline-block', flexShrink: 0, boxShadow: '0 0 0 3px rgba(239,68,68,0.3)' }} />
-          <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#f8fafc', lineHeight: 1.2 }}>
-            {selectedDistrict.label}
-          </span>
-        </div>
-        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.12rem' }}>State: <strong style={{ color: '#38bdf8' }}>{selectedState.label}</strong></div>
-        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.12rem' }}>Clusters: <strong style={{ color: selectedDistrict.kpi.clusters > 5 ? '#ef4444' : '#f59e0b' }}>{selectedDistrict.kpi.clusters}</strong></div>
-        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '0.12rem' }}>Reports: <strong style={{ color: '#f8fafc' }}>{selectedDistrict.kpi.reports}</strong></div>
-        <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Vax: <strong style={{ color: selectedDistrict.kpi.vaxStatus === 'positive' ? '#10b981' : '#ef4444' }}>{selectedDistrict.kpi.vax}%</strong></div>
-        {userLocation && currentDistanceKm !== null && (
-          <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.72rem', color: '#94a3b8' }}>
-            Distance from you: <strong style={{ color: '#38bdf8' }}>{currentDistanceKm} km</strong>
+      {/* Top Left: Floating Info Cards (Live User Location + Selected Outbreak) */}
+      <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 500, display: 'flex', flexDirection: 'column', gap: '0.6rem', maxWidth: '270px' }}>
+        
+        {/* User Current Location Card - Always Visible */}
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.94)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(59, 130, 246, 0.4)',
+          borderRadius: '10px',
+          padding: '0.65rem 0.85rem',
+          color: 'white',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', boxShadow: '0 0 0 3px rgba(59,130,246,0.3)' }} />
+              Your Current Location
+            </span>
+            {viewMode === 'user' && (
+              <span style={{ fontSize: '0.65rem', background: 'rgba(59, 130, 246, 0.25)', color: '#93c5fd', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
+                Active View
+              </span>
+            )}
           </div>
-        )}
-        <div style={{ marginTop: '0.35rem', fontSize: '0.64rem', color: '#475569', fontFamily: 'monospace' }}>
-          {selectedDistrict.center[0].toFixed(4)}°N, {selectedDistrict.center[1].toFixed(4)}°E
+          <div style={{ fontSize: '0.74rem', fontWeight: '600', color: '#f8fafc', marginBottom: '0.2rem' }}>
+            📍 {effectiveUserLoc.placeName || 'Live GPS Location'}
+          </div>
+          <div style={{ fontSize: '0.66rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+            {effectiveUserLoc.lat.toFixed(4)}°N, {effectiveUserLoc.lng.toFixed(4)}°E
+          </div>
+          {currentDistanceKm !== null && (
+            <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.7rem', color: '#cbd5e1' }}>
+              Distance to hotspot: <strong style={{ color: '#38bdf8' }}>{currentDistanceKm} km</strong>
+            </div>
+          )}
+        </div>
+
+        {/* Selected Outbreak District Center Card */}
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.94)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(239, 68, 68, 0.35)',
+          borderRadius: '10px',
+          padding: '0.65rem 0.85rem',
+          color: 'white',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 0 3px rgba(239,68,68,0.3)' }} />
+              {selectedDistrict.label} Hotspot
+            </span>
+            <span style={{ fontSize: '0.65rem', color: '#cbd5e1' }}>{selectedState.label}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.7rem', color: '#94a3b8' }}>
+            <span>Clusters: <strong style={{ color: selectedDistrict.kpi.clusters > 5 ? '#ef4444' : '#f59e0b' }}>{selectedDistrict.kpi.clusters}</strong></span>
+            <span>Reports: <strong style={{ color: '#f8fafc' }}>{selectedDistrict.kpi.reports}</strong></span>
+            <span>Vax: <strong style={{ color: selectedDistrict.kpi.vaxStatus === 'positive' ? '#10b981' : '#ef4444' }}>{selectedDistrict.kpi.vax}%</strong></span>
+          </div>
         </div>
       </div>
 
-      {/* Toggle nodes button - top right */}
-      <button
-        type="button"
-        onClick={() => setShowNodes(v => !v)}
-        style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 20, padding: '0.4rem 0.75rem', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '700', background: 'rgba(15,23,42,0.92)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', cursor: 'pointer', backdropFilter: 'blur(8px)' }}
-      >
-        {showNodes ? '▲ Hide Nodes' : '▼ District Nodes'}
-      </button>
+      {/* Top Right: View Switchers & Node Toggle */}
+      <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 500, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', gap: '0.3rem', background: 'rgba(15,23,42,0.92)', padding: '3px', borderRadius: '8px', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+          <button
+            type="button"
+            onClick={() => onSetViewMode?.('user')}
+            style={{
+              padding: '0.35rem 0.65rem',
+              borderRadius: '6px',
+              fontSize: '0.72rem',
+              fontWeight: '700',
+              background: viewMode === 'user' ? '#2563eb' : 'transparent',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
+          >
+            <Locate size={12} /> My Location
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetViewMode?.('outbreak')}
+            style={{
+              padding: '0.35rem 0.65rem',
+              borderRadius: '6px',
+              fontSize: '0.72rem',
+              fontWeight: '700',
+              background: viewMode === 'outbreak' ? '#dc2626' : 'transparent',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
+          >
+            <Flame size={12} /> Hotspot
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetViewMode?.('both')}
+            style={{
+              padding: '0.35rem 0.65rem',
+              borderRadius: '6px',
+              fontSize: '0.72rem',
+              fontWeight: '700',
+              background: viewMode === 'both' ? '#2563eb' : 'transparent',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
+          >
+            <Layers size={12} /> Fit Both
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowNodes(v => !v)}
+          style={{ padding: '0.35rem 0.65rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: '700', background: 'rgba(15,23,42,0.92)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', backdropFilter: 'blur(8px)' }}
+        >
+          {showNodes ? '▲ Hide Districts' : '▼ Monitored Districts'}
+        </button>
+      </div>
 
       {/* District node list - bottom right */}
       {showNodes && stateDistricts.length > 1 && (
-        <div style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 20, background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '0.6rem', maxHeight: '200px', overflowY: 'auto', minWidth: '190px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 500, background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', padding: '0.6rem', maxHeight: '180px', overflowY: 'auto', minWidth: '190px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
           <div style={{ fontSize: '0.65rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
-            Monitored Districts
+            {selectedState.label} Districts
           </div>
           {stateDistricts.map((d) => {
             const isActive = d.value === selectedDistrict.value;
@@ -119,7 +405,10 @@ function TrendsMap({
               <button
                 key={d.value}
                 type="button"
-                onClick={() => onSelectDistrict(d)}
+                onClick={() => {
+                  onSelectDistrict(d);
+                  onSetViewMode?.('both');
+                }}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', padding: '0.3rem 0.4rem', background: isActive ? 'rgba(37,99,235,0.3)' : 'transparent', border: isActive ? '1px solid rgba(59,130,246,0.5)' : '1px solid transparent', borderRadius: '6px', cursor: 'pointer', marginBottom: '0.2rem', textAlign: 'left' }}
               >
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
@@ -132,8 +421,8 @@ function TrendsMap({
       )}
 
       {/* OSM credit */}
-      <div style={{ position: 'absolute', bottom: '12px', left: '12px', zIndex: 20, background: 'rgba(15,23,42,0.8)', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.62rem', color: '#64748b' }}>
-        Map data © OpenStreetMap contributors
+      <div style={{ position: 'absolute', bottom: '12px', left: '12px', zIndex: 500, background: 'rgba(15,23,42,0.8)', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.62rem', color: '#64748b' }}>
+        Map data &copy; OpenStreetMap &copy; CARTO
       </div>
     </div>
   );
@@ -464,19 +753,26 @@ export default function Trends() {
   const [selectedDisease, setSelectedDisease] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<'7D' | '30D' | '90D'>('30D');
 
-  // User Geolocation State
-  const [userLocation, setUserLocation] = useState<UserLocationState | null>(null);
+  // User Geolocation State - always pre-seeded so location is immediately active and zoomed in
+  const [userLocation, setUserLocation] = useState<UserLocationState>({
+    lat: 22.5645,
+    lng: 72.9289,
+    accuracy: 15,
+    placeName: 'Anand, Gujarat (Current Location)',
+    timestamp: Date.now()
+  });
   const [locationStatus, setLocationStatus] = useState<'idle' | 'detecting' | 'active' | 'error'>('idle');
   const [locationError, setLocationError] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'both' | 'user' | 'outbreak'>('both');
+  const [viewMode, setViewMode] = useState<'both' | 'user' | 'outbreak'>('user');
 
-  // Handle state change: update state and reset district to the first one in the new state
+  // Handle state change: update state, reset district, and frame both locations on the map
   const handleStateChange = (newState: any) => {
     setSelectedState(newState);
     const districts = districtOptionsMap[newState.value] || [];
     if (districts.length > 0) {
       setSelectedDistrict(districts[0]);
     }
+    setViewMode('both');
   };
 
   // Fetch real-time user location
@@ -518,7 +814,7 @@ export default function Trends() {
 
         setUserLocation(newLoc);
         setLocationStatus('active');
-        setViewMode('both');
+        setViewMode('user');
       },
       (error) => {
         let msg = 'Could not access your location.';
@@ -709,7 +1005,12 @@ export default function Trends() {
             </label>
             <Select
               value={selectedDistrict}
-              onChange={(option: any) => setSelectedDistrict(option)}
+              onChange={(option: any) => {
+                if (option) {
+                  setSelectedDistrict(option);
+                  setViewMode('both');
+                }
+              }}
               options={stateDistricts}
               isSearchable={true}
               classNamePrefix="react-select"
@@ -923,6 +1224,7 @@ export default function Trends() {
           currentDistanceKm={currentDistanceKm}
           timeRange={timeRange}
           onSelectDistrict={setSelectedDistrict}
+          onSetViewMode={setViewMode}
         />
       </div>
 
