@@ -1,14 +1,15 @@
 # 🐄 PashuRaksha — Livestock Disease Surveillance Platform
 > Smart India Hackathon 2026 | Problem Statement 26128
 
-A real-time disease outbreak surveillance and reporting system for Indian livestock farmers and veterinary officials. Built with React, Node.js, and Supabase.
+A real-time disease outbreak surveillance and reporting system for Indian livestock farmers and veterinary officials. Combines AI-powered image analysis for disease detection with geospatial tracking and epidemiological monitoring. Built with React, Node.js, FastAPI, and Supabase.
 
 ---
 
 ## 📋 Features
 
+- **AI-Powered Disease Detection** — Deep learning model (EfficientNetB0) analyzes livestock images for disease signs (Lumpy Skin Disease, other infections)
 - **Disease Outbreak Map** — Real-time geospatial surveillance across all 36 Indian States & UTs
-- **AI-Powered Report Submission** — Farmers can report symptoms via text or voice recording
+- **Smart Report Submission** — Farmers submit images + audio symptoms; backend integrates with ML API for diagnosis
 - **Herd Management** — Track animals, vaccination schedules, and health status
 - **Epidemiological Trends** — Charts for incidence, mortality, pathogen distribution, and vaccination coverage
 - **Multilingual Support** — English, Hindi, and Marathi
@@ -20,24 +21,41 @@ A real-time disease outbreak surveillance and reporting system for Indian livest
 
 ```
 SIH_26128/
-├── frontend/          # React + Vite + TypeScript frontend
+├── frontend/                      # React + Vite + TypeScript frontend
 │   ├── src/
-│   │   ├── components/   # UI components (Dashboard, Trends, Herd, etc.)
-│   │   ├── lib/          # Supabase client, utilities
-│   │   ├── i18n/         # Language translations (EN/HI/MR)
-│   │   └── App.tsx       # Routes and auth
-│   ├── .env.local        # 🔒 Your Supabase credentials (not committed)
-│   └── .env.example      # Template for required env vars
+│   │   ├── components/            # UI components (Dashboard, Trends, Herd, Login, etc.)
+│   │   ├── lib/                   # Supabase client, utilities, auth
+│   │   ├── i18n/                  # Language translations (EN/HI/MR)
+│   │   └── App.tsx                # Routes and auth logic
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── .env.local                 # 🔒 Your Supabase credentials (not committed)
+│   └── .env.example               # Template for required env vars
 │
-├── backend/           # Node.js + Express backend (mock OTP auth)
-│   └── src/index.ts
+├── backend/                       # Node.js + Express backend
+│   ├── src/
+│   │   ├── index.ts               # Main server
+│   │   └── routes/
+│   │       └── callMLmodel.ts     # ML model integration endpoint
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── .env                       # Backend config (ML API URL)
 │
-├── supabase/          # Supabase configuration
+├── livestock-disease-api-v2/      # 🤖 FastAPI ML Server (Disease Detection)
+│   ├── app.py                     # FastAPI app with /predict endpoint
+│   ├── best_livestock_model.keras # Pre-trained EfficientNetB0 model
+│   ├── requirements.txt           # Python dependencies
+│   ├── Dockerfile                 # Docker configuration
+│   └── .dockerignore
+│
+├── supabase/                      # Supabase configuration & migrations
+│   ├── config.toml
 │   └── migrations/
 │       └── 20260901_initial_schema.sql   # DB schema: profiles, animals, reports
 │
-├── .gitignore         # Root-level gitignore (covers all sub-projects)
-└── README.md          # This file
+├── .gitignore                     # Root-level gitignore
+└── README.md                      # This file
 ```
 
 ---
@@ -45,47 +63,152 @@ SIH_26128/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js >= 18
+- **Node.js** >= 18
+- **Python** >= 3.11 (for ML model)
+- **Docker** (recommended for ML model, optional)
 - A [Supabase](https://supabase.com) project (free tier works)
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/SIH_26128.git
+git clone https://github.com/mayankbisht1212/SIH_26128.git
 cd SIH_26128
 ```
 
 ### 2. Set up the database
 Run the migration in your Supabase project's **SQL Editor**:
+```sql
+-- Copy contents of supabase/migrations/20260901_initial_schema.sql
 ```
-supabase/migrations/20260901_initial_schema.sql
-```
-This creates the `profiles`, `animals`, and `reports` tables with RLS policies.
+This creates the `profiles`, `animals`, and `reports` tables with Row-Level Security (RLS) policies.
 
 ### 3. Configure environment variables
+
+#### Frontend
 ```bash
-cp frontend/.env.example frontend/.env.local
+cd frontend
+cp .env.example .env.local
 ```
-Fill in your Supabase URL and publishable key:
+Fill in your Supabase credentials:
 ```env
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-### 4. Install and run the frontend
+#### Backend (Optional)
 ```bash
-cd frontend
-npm install
-npm run dev
+cd backend
+cat > .env << EOF
+ML_API_URL=http://localhost:5000
+ML_API_PORT=5000
+EOF
 ```
-App runs at **http://localhost:5173**
 
-### 5. (Optional) Run the backend mock auth server
+### 4. Set up & run the ML Model API
+
+#### Option A: Using Docker (Recommended)
+```bash
+cd livestock-disease-api-v2
+docker build -t livestock-disease-api .
+docker run -p 5000:5000 livestock-disease-api
+```
+
+#### Option B: Local Python Environment
+```bash
+cd livestock-disease-api-v2
+pip install -r requirements.txt
+python -m uvicorn app:app --host 0.0.0.0 --port 5000
+```
+
+ML API will be available at **http://localhost:5000**
+
+Test it:
+```bash
+curl http://localhost:5000/health
+# Should return: {"status": "healthy"}
+```
+
+### 5. Install and run the backend
 ```bash
 cd backend
 npm install
 npm run dev
 ```
-Mock OTP server runs at **http://localhost:4000**
+Backend runs at **http://localhost:4000**
+
+### 6. Install and run the frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Frontend runs at **http://localhost:5173**
+
+---
+
+## 🏛️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Frontend (React/Vite)                   │
+│                    http://localhost:5173                    │
+│  • Dashboard, Trends, Herd Management, Report Form          │
+│  • Multilingual UI (EN/HI/MR)                               │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+        ▼                             ▼
+┌──────────────────┐        ┌──────────────────────┐
+│    Supabase      │        │  Backend (Node.js)   │
+│  • PostgreSQL    │        │  http://localhost... │
+│  • Auth & Rows   │        │  • Endpoints         │
+│  • Storage       │        │  • ML Integration    │
+└──────────────────┘        └──────┬───────────────┘
+                                   │
+                                   ▼
+                        ┌──────────────────────┐
+                        │  ML API (FastAPI)    │
+                        │ http://localhost:... │
+                        │  • /predict endpoint │
+                        │  • EfficientNetB0    │
+                        │  • Disease Detection │
+                        └──────────────────────┘
+```
+
+---
+
+## 🔌 API Endpoints
+
+### ML Model API (`livestock-disease-api-v2/`)
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/` | GET | API status & model info |
+| `/health` | GET | Health check |
+| `/predict` | POST | Predict disease from image + audio |
+
+**Request (POST /predict):**
+```
+Content-Type: multipart/form-data
+- file: image file (JPEG/PNG)
+- audio: audio file (MP3/WAV)
+```
+
+**Response:**
+```json
+{
+  "prediction": "Lumpy_Skin",
+  "confidence": 0.95,
+  "classes": ["Healthy", "Lumpy_Skin", "Other_Infections"]
+}
+```
+
+### Backend API (`backend/`)
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/reports` | Submit disease report with image & audio |
+| `GET /api/reports` | Fetch reports for location/timeframe |
+
+Backend forwards report submissions to ML API and stores results in Supabase.
 
 ---
 
@@ -93,11 +216,123 @@ Mock OTP server runs at **http://localhost:4000**
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, TypeScript, Vite |
-| Styling | Vanilla CSS, CSS Variables |
-| Charts | Recharts |
-| Auth & DB | Supabase (PostgreSQL + Auth) |
-| Backend | Node.js, Express |
+| **Frontend** | React 18, TypeScript, Vite |
+| **Styling** | Vanilla CSS, CSS Variables |
+| **Charts** | Recharts |
+| **Backend** | Node.js, Express, TypeScript |
+| **ML Model** | FastAPI, TensorFlow/Keras, EfficientNetB0 |
+| **Database** | Supabase (PostgreSQL + Row-Level Security) |
+| **Deployment** | Docker (ML model), Vercel/Netlify (frontend) |
+| **Containerization** | Docker, Docker Compose (optional) |
+
+---
+
+## 📦 Dependencies
+
+### Frontend
+- `react`: UI framework
+- `recharts`: Charts for trends
+- `@supabase/supabase-js`: Database & auth client
+- `vite`: Build tool
+
+### Backend
+- `express`: Web framework
+- `axios`: HTTP client (for ML API calls)
+- `cors`: Cross-origin middleware
+- `typescript`: Type safety
+
+### ML Model
+- `fastapi`: Web framework
+- `tensorflow==2.21.0`: Deep learning
+- `pillow`: Image processing
+- `numpy`: Numerical computing
+- `uvicorn`: ASGI server
+
+---
+
+## 🧪 Testing
+
+### Test ML Model Locally
+```bash
+cd backend
+npm run dev
+
+# In another terminal, test the prediction endpoint
+curl -X POST http://localhost:5001/predict \
+  -F "file=@path/to/image.jpg" \
+  -F "audio=@path/to/audio.wav"
+```
+
+### Test Frontend
+```bash
+cd frontend
+npm run dev
+# Visit http://localhost:5173
+# Login with test credentials (mock auth)
+```
+
+---
+
+## 🚢 Deployment
+
+### Frontend
+1. Build: `cd frontend && npm run build`
+2. Deploy to **Vercel** or **Netlify**
+3. Set environment variables in dashboard
+
+### Backend
+1. Build: `cd backend && npm run build`
+2. Deploy to **Heroku**, **Railway**, or **Fly.io**
+
+### ML Model
+1. Docker image: `docker build -t livestock-disease-api .`
+2. Push to **Docker Hub** or **AWS ECR**
+3. Deploy to **AWS ECS**, **Google Cloud Run**, or **Railway**
+
+---
+
+## 📋 Development Workflow
+
+1. **Feature branches:** Create branches from `main` (e.g., `feature/herd-management`)
+2. **Testing:** Run tests before opening PRs
+3. **Pull Requests:** Include description of changes
+4. **Merge:** Squash and merge to keep history clean
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push and open a Pull Request
+
+---
+
+## 📄 License
+
+This project is part of **Smart India Hackathon 2026** (Problem 26128).
+
+---
+
+## 📞 Support
+
+For issues or questions:
+1. Check **GitHub Issues**
+2. Review existing documentation
+3. Contact team members
+
+---
+
+## 🎯 Next Steps
+
+- [ ] Integrate audio transcription for symptom analysis
+- [ ] Expand ML model to more livestock diseases
+- [ ] Add veterinary officer dashboard
+- [ ] Real-time push notifications
+- [ ] Mobile app (React Native)
+- [ ] Integration with government livestock databases
 | Icons | Lucide React |
 | i18n | Custom LanguageContext |
 
