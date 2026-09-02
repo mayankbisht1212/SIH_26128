@@ -1,54 +1,50 @@
 import express, { type Request, type Response } from 'express';
 import cors from 'cors';
-import { randomInt } from 'crypto';
-
-type OtpRecord = { otp: string; expiresAt: number };
-type SendOtpBody = { phone?: string };
-type VerifyOtpBody = { phone?: string; otp?: string; role?: string };
+import multer from 'multer';
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
-const OTP_TTL_MS = 5 * 60 * 1000;
-const otpStore = new Map<string, OtpRecord>();
+const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001';
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 2 }
+});
 
 // Development-only API. Keep CORS unrestricted locally so Vite can use a
 // fallback port (for example 5174) if 5173 is already occupied.
 app.use(cors());
 app.use(express.json());
 
-const normalisePhone = (phone = ''): string | null => {
-  const digits = String(phone).replace(/\D/g, '');
-  if (digits.length === 10) return `+91${digits}`;
-  return digits.length >= 11 && digits.length <= 15 ? `+${digits}` : null;
-};
+app.get('/api/health', (_req: Request, res: Response) => res.json({ status: 'ok', mlApiUrl: ML_API_URL }));
 
-app.get('/api/health', (_req: Request, res: Response) => res.json({ status: 'ok' }));
-
-app.post('/api/auth/send-otp', (req: Request<object, object, SendOtpBody>, res: Response) => {
-  const phone = normalisePhone(req.body.phone);
-  if (!phone) return res.status(400).json({ message: 'Enter a valid phone number.' });
-
-  const otp = randomInt(100000, 1000000).toString();
-  otpStore.set(phone, { otp, expiresAt: Date.now() + OTP_TTL_MS });
-  console.log(`[DEV ONLY] OTP for ${phone}: ${otp}`);
-
-  // devOtp is deliberately returned only by this local fake backend. Never do
-  // this with a real SMS provider or production deployment.
-  return res.json({ message: 'OTP generated for development.', expiresInSeconds: OTP_TTL_MS / 1000, devOtp: otp });
-});
-
-app.post('/api/auth/verify-otp', (req: Request<object, object, VerifyOtpBody>, res: Response) => {
-  const phone = normalisePhone(req.body.phone);
-  const otp = String(req.body.otp || '');
-  const record = phone && otpStore.get(phone);
-  if (!record || record.expiresAt < Date.now()) {
-    if (phone) otpStore.delete(phone);
-    return res.status(400).json({ message: 'OTP is invalid or has expired. Request a new code.' });
+app.post('/api/ml/predict', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'audio', maxCount: 1 }]), async (req: Request, res: Response) => {
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+  const image = files?.file?.[0];
+  const audio = files?.audio?.[0];
+  if (!image || !audio) return res.status(400).json({ message: 'Both an image file and an audio file are required.' });
+  if (!image.mimetype.startsWith('image/') || !audio.mimetype.startsWith('audio/')) {
+    return res.status(400).json({ message: 'Upload a valid image and audio file.' });
   }
-  if (record.otp !== otp) return res.status(400).json({ message: 'Incorrect OTP.' });
 
-  otpStore.delete(phone);
-  return res.json({ user: { id: `mock-${Buffer.from(phone).toString('base64url')}`, phone, role: req.body.role || 'Farmer' } });
+  const toBlob = (file: Express.Multer.File) => {
+    // Copy Buffer data into a browser-compatible typed array for Node's FormData.
+    const bytes = new Uint8Array(file.buffer.byteLength);
+    bytes.set(file.buffer);
+    return new Blob([bytes], { type: file.mimetype });
+  };
+  const formData = new FormData();
+  formData.append('file', toBlob(image), image.originalname || 'animal-photo.jpg');
+  formData.append('audio', toBlob(audio), audio.originalname || 'voice-message.webm');
+
+  try {
+    const mlResponse = await fetch(`${ML_API_URL}/predict`, { method: 'POST', body: formData });
+    const payload = await mlResponse.json().catch(() => null);
+    if (!mlResponse.ok) return res.status(mlResponse.status).json(payload || { message: 'ML service rejected the upload.' });
+    return res.json(payload);
+  } catch (error) {
+    console.error('ML API request failed:', error);
+    return res.status(502).json({ message: 'The ML service is unavailable. Confirm it is running and try again.' });
+  }
 });
 
 app.listen(PORT, () => console.log(`Fake OTP backend listening on http://localhost:${PORT}`));

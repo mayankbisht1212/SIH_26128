@@ -35,9 +35,7 @@ SIH_26128/
 │
 ├── backend/                       # Node.js + Express backend
 │   ├── src/
-│   │   ├── index.ts               # Main server
-│   │   └── routes/
-│   │       └── callMLmodel.ts     # ML model integration endpoint
+│   │   └── index.ts               # ML proxy and health endpoints
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── .env                       # Backend config (ML API URL)
@@ -94,15 +92,13 @@ Fill in your Supabase credentials:
 ```env
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+VITE_API_URL=http://localhost:4000
 ```
 
-#### Backend (Optional)
+#### Backend
 ```bash
 cd backend
-cat > .env << EOF
-ML_API_URL=http://localhost:5000
-ML_API_PORT=5000
-EOF
+cp .env.example .env
 ```
 
 ### 4. Set up & run the ML Model API
@@ -111,21 +107,21 @@ EOF
 ```bash
 cd livestock-disease-api-v2
 docker build -t livestock-disease-api .
-docker run -p 5000:5000 livestock-disease-api
+docker run --rm -p 5001:5000 livestock-disease-api
 ```
 
 #### Option B: Local Python Environment
 ```bash
 cd livestock-disease-api-v2
 pip install -r requirements.txt
-python -m uvicorn app:app --host 0.0.0.0 --port 5000
+python -m uvicorn app:app --host 0.0.0.0 --port 5001
 ```
 
-ML API will be available at **http://localhost:5000**
+ML API will be available at **http://localhost:5001**
 
 Test it:
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:5001/health
 # Should return: {"status": "healthy"}
 ```
 
@@ -186,7 +182,7 @@ Frontend runs at **http://localhost:5173**
 |---|---|---|
 | `/` | GET | API status & model info |
 | `/health` | GET | Health check |
-| `/predict` | POST | Predict disease from image + audio |
+| `/predict` | POST | Predict disease from image + audio (called only by the backend) |
 
 **Request (POST /predict):**
 ```
@@ -198,19 +194,20 @@ Content-Type: multipart/form-data
 **Response:**
 ```json
 {
-  "prediction": "Lumpy_Skin",
-  "confidence": 0.95,
-  "classes": ["Healthy", "Lumpy_Skin", "Other_Infections"]
+  "success": true,
+  "disease": "Lumpy_Skin",
+  "confidence_percent": 95,
+  "audio": { "received": true }
 }
 ```
 
 ### Backend API (`backend/`)
 | Endpoint | Purpose |
 |---|---|
-| `POST /api/reports` | Submit disease report with image & audio |
-| `GET /api/reports` | Fetch reports for location/timeframe |
+| `POST /api/ml/predict` | Accept image + audio and proxy them to the ML API |
+| `GET /api/health` | Backend health check |
 
-Backend forwards report submissions to ML API and stores results in Supabase.
+The frontend stores authenticated reports, media paths, and ML outputs in Supabase. The backend forwards only the media analysis request to the ML API.
 
 ---
 
@@ -218,7 +215,7 @@ Backend forwards report submissions to ML API and stores results in Supabase.
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 18, TypeScript, Vite |
+| **Frontend** | React 19, TypeScript, Vite |
 | **Styling** | Vanilla CSS, CSS Variables |
 | **Charts** | Recharts |
 | **Backend** | Node.js, Express, TypeScript |
@@ -260,7 +257,7 @@ cd backend
 npm run dev
 
 # In another terminal, test the prediction endpoint
-curl -X POST http://localhost:5001/predict \
+curl -X POST http://localhost:4000/api/ml/predict \
   -F "file=@path/to/image.jpg" \
   -F "audio=@path/to/audio.wav"
 ```
@@ -270,7 +267,7 @@ curl -X POST http://localhost:5001/predict \
 cd frontend
 npm run dev
 # Visit http://localhost:5173
-# Login with test credentials (mock auth)
+# Sign in with an OTP configured in Supabase Auth
 ```
 
 ---
@@ -346,7 +343,8 @@ For issues or questions:
 |---|---|---|
 | `VITE_SUPABASE_URL` | ✅ | Your Supabase project URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | ✅ | Supabase publishable/anon key |
-| `VITE_AUTH_MODE` | Optional | Set to `mock` for local dev without Supabase |
+| `VITE_API_URL` | ✅ | Backend URL, e.g. `http://localhost:4000` |
+| `ML_API_URL` | ✅ Backend only | ML API URL, e.g. `http://localhost:5001` |
 
 ---
 

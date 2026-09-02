@@ -4,8 +4,7 @@ import { User, Stethoscope, FlaskConical, Building2, Settings, Globe, Moon, Sun 
 import logoImg from '../assets/logo.jpg';
 import './Login.css';
 import { useLanguage } from '../i18n/LanguageContext';
-import { requireSupabase } from '../lib/supabase';
-import { isMockAuth, sendMockOtp, verifyMockOtp } from '../lib/mockAuth';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 const ROLES = [
   'Farmer',
@@ -23,7 +22,7 @@ const ROLE_ICONS = {
   'System Administrator': <Settings size={16} />
 };
 
-export default function Login({ onMockLogin }) {
+export default function Login({ onDemoLogin }: { onDemoLogin?: (user: any) => void }) {
   const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const [theme, setTheme] = useState('light');
@@ -54,20 +53,6 @@ export default function Login({ onMockLogin }) {
     return digits.length === 10 ? `+91${digits}` : value.startsWith('+') ? value : `+${digits}`;
   };
 
-  const handleQuickDemoLogin = (role: string = 'Farmer') => {
-    const mockUser = {
-      id: `demo-${role.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
-      email: `${role.toLowerCase().replace(/\s+/g, '')}@pashuraksha.gov.in`,
-      role,
-      user_metadata: {
-        full_name: role === 'Farmer' ? 'Ramesh Yadav' : role === 'Field Veterinarian' ? 'Dr. Anil Sharma' : 'District Officer Patel',
-        role
-      }
-    };
-    onMockLogin?.({ user: mockUser, access_token: `demo-token-${Date.now()}` });
-    navigate('/dashboard');
-  };
-
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -77,21 +62,9 @@ export default function Login({ onMockLogin }) {
     }
     try {
       setIsSubmitting(true);
-      if (isMockAuth) {
-        const data = await sendMockOtp(normalisePhone(mobile));
-        setError(`Development OTP: ${data.devOtp || '123456'}`);
-      } else {
-        try {
-          const { error: authError } = await requireSupabase().auth.signInWithOtp({
-            phone: normalisePhone(mobile), options: { data: { role: selectedRole } }
-          });
-          if (authError) throw authError;
-        } catch (supaErr: any) {
-          console.warn('Supabase OTP service unavailable, using mock OTP:', supaErr);
-          const data = await sendMockOtp(normalisePhone(mobile));
-          setError(`Development OTP: ${data.devOtp || '123456'}`);
-        }
-      }
+      // Temporary demo mode: replace with Supabase signInWithOtp before production.
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setError('Demo OTP generated: 123456');
       setOtpSent(true);
     } catch (authError: any) {
       setError(authError.message || 'Failed to send OTP.');
@@ -105,24 +78,27 @@ export default function Login({ onMockLogin }) {
     setError('');
     try {
       setIsSubmitting(true);
-      let verifiedUser: any = null;
-      if (isMockAuth) {
-        const data = await verifyMockOtp(normalisePhone(mobile), otp, selectedRole);
-        verifiedUser = data.user || data;
-      } else {
-        try {
-          const client = requireSupabase();
-          const { data, error: authError } = await client.auth.verifyOtp({ phone: normalisePhone(mobile), token: otp, type: 'sms' });
-          if (authError) throw authError;
-          verifiedUser = data.user;
-          if (email && data.user) await client.auth.updateUser({ data: { email } });
-        } catch (supaErr: any) {
-          console.warn('Supabase OTP verification fallback:', supaErr);
-          const data = await verifyMockOtp(normalisePhone(mobile), otp, selectedRole);
-          verifiedUser = data.user || data;
+      if (otp !== '123456') throw new Error('Invalid demo OTP. Use 123456.');
+      let authenticatedUser: any = {
+        id: '00000000-0000-4000-8000-000000000001',
+        phone: normalisePhone(mobile),
+        email: email || 'demo@pashuraksha.local',
+        role: selectedRole,
+        user_metadata: { full_name: 'Demo User', role: selectedRole }
+      };
+
+      // A real anonymous Supabase session keeps Storage and report RLS policies active
+      // while the OTP itself remains a no-cost local simulation.
+      if (isSupabaseConfigured && supabase) {
+        const { data, error: anonymousAuthError } = await supabase.auth.signInAnonymously({
+          options: { data: { full_name: 'Demo User', role: selectedRole, phone: normalisePhone(mobile) } }
+        });
+        if (anonymousAuthError || !data.user) {
+          throw new Error('Enable Anonymous Sign-Ins in Supabase Authentication → Providers to save demo reports.');
         }
+        authenticatedUser = data.user;
       }
-      onMockLogin?.({ user: { ...verifiedUser, email, role: selectedRole } });
+      onDemoLogin?.(authenticatedUser);
       navigate('/dashboard');
     } catch (authError: any) {
       setError(authError.message || 'Invalid OTP');
@@ -136,18 +112,8 @@ export default function Login({ onMockLogin }) {
     setError('');
     try {
       setIsSubmitting(true);
-      if (isMockAuth) {
-        handleQuickDemoLogin(selectedRole || 'System Administrator');
-        return;
-      }
-      try {
-        const { error: authError } = await requireSupabase().auth.signInWithPassword({ email: adminEmail, password: adminPassword });
-        if (authError) throw authError;
-        navigate('/dashboard');
-      } catch (supaErr: any) {
-        console.warn('Supabase password login fallback to demo:', supaErr);
-        handleQuickDemoLogin('System Administrator');
-      }
+      throw new Error('Administrator login is unavailable while demo authentication is enabled.');
+      navigate('/dashboard');
     } catch (authError: any) {
       setError(authError.message || 'Admin login failed.');
     } finally {
@@ -243,6 +209,7 @@ export default function Login({ onMockLogin }) {
         <div className="login-card slide-down">
           <h2 className="login-title">{t('welcomeBack')}</h2>
           <p className="login-subtitle">{t('accessDashboard')}</p>
+          <p style={{ color: '#b45309', fontSize: '0.82rem', marginBottom: '1rem' }}>Demo authentication is enabled. No SMS will be sent.</p>
           {error && <p role="alert" style={{ color: '#dc2626', fontSize: '0.85rem', marginBottom: '1rem' }}>{error}</p>}
 
           {!showAdmin ? (
@@ -364,36 +331,6 @@ export default function Login({ onMockLogin }) {
               </button>
             </div>
           )}
-
-          {/* Fast Instant Demo Login */}
-          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
-            <p style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--text-light)', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '0.04em' }}>
-              ⚡ Instant One-Click Demo Access
-            </p>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('Farmer')}
-                style={{ padding: '0.45rem 0.8rem', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' }}
-              >
-                👨‍🌾 Farmer Demo
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('Field Veterinarian')}
-                style={{ padding: '0.45rem 0.8rem', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' }}
-              >
-                🩺 Vet Demo
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('System Administrator')}
-                style={{ padding: '0.45rem 0.8rem', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' }}
-              >
-                🔐 Admin Demo
-              </button>
-            </div>
-          </div>
 
         </div>
       </main>

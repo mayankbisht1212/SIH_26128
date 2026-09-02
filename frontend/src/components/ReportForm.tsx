@@ -228,19 +228,23 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
     };
   };
 
-  const requestModelPrediction = async () => {
+  const prepareImageForUpload = async () => {
     if (!image || !audioBlob) {
       throw new Error('Please attach a symptom photograph and record a voice message before submitting for AI analysis.');
     }
 
     const imageResponse = await fetch(image);
     if (!imageResponse.ok) throw new Error('The selected photo could not be prepared for AI analysis.');
-    const imageBlob = await imageResponse.blob();
+    return imageResponse.blob();
+  };
+
+  const requestModelPrediction = async (imageBlob: Blob) => {
+    if (!audioBlob) throw new Error('Please record a voice message before submitting for AI analysis.');
     const formData = new FormData();
     formData.append('file', imageBlob, 'animal-photo.jpg');
     formData.append('audio', audioBlob, 'voice-message.webm');
 
-    const response = await fetch(`${import.meta.env.VITE_ML_API_URL || 'http://localhost:5001'}/predict`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/ml/predict`, {
       method: 'POST',
       body: formData
     });
@@ -331,8 +335,10 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
       setIsSubmitting(true);
 
       let modelResponse: { disease: string; confidence_percent: number; audio: { received: boolean } };
+      let imageBlob: Blob;
       try {
-        modelResponse = await requestModelPrediction();
+        imageBlob = await prepareImageForUpload();
+        modelResponse = await requestModelPrediction(imageBlob);
       } catch (predictionError) {
         setError(predictionError instanceof Error ? predictionError.message : 'Unable to reach the ML service. Please try again.');
         setIsSubmitting(false);
@@ -340,8 +346,9 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
       }
 
       const diagnosis = diagnosisFromModel(modelResponse);
+      const reportId = `REP-${Math.floor(100000 + Math.random() * 900000)}`;
       const reportSnapshot = {
-        id: `REP-${Math.floor(100000 + Math.random() * 900000)}`,
+        id: reportId,
         timestamp: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
         species: species ? (speciesOptions.find(s => s.id === species)?.label || species) : 'Livestock (Unspecified)',
         speciesIcon: speciesOptions.find(s => s.id === species)?.icon || '🐾',
@@ -365,29 +372,41 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
 
       setSubmittedReportData(reportSnapshot);
 
-      // Attempt Supabase backend save (gracefully handles mock mode or network delays)
       try {
-        if (supabase) {
-          const { data: { user } } = await supabase.auth.getUser();
-          const [latitude, longitude] = reportSnapshot.location.gps.split(',').map((v) => Number(v.trim()));
+        if (!supabase || !audioBlob) throw new Error('Supabase must be configured to save reports.');
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) throw new Error('Your session has expired. Please sign in again.');
 
-          await supabase.from('reports').insert({
-            reporter_id: user?.id || '00000000-0000-0000-0000-000000000000',
-            species: species || null,
-            symptoms_text: symptoms || null,
-            selected_symptoms: selectedSymptoms,
-            mortality_count: Number(mortality) || 0,
-            village: location.village || null,
-            block: location.block || null,
-            district: location.district || null,
-            latitude: Number.isFinite(latitude) ? latitude : null,
-            longitude: Number.isFinite(longitude) ? longitude : null,
-            assessment: `${diagnosis.disease} (${diagnosis.riskLevel})`,
-            status: 'pending'
-          });
-        }
+        const mediaFolder = `${user.id}/${reportId}`;
+        const imagePath = `${mediaFolder}/animal-photo.jpg`;
+        const audioPath = `${mediaFolder}/voice-message.webm`;
+        const imageUpload = await supabase.storage.from('report-media').upload(imagePath, imageBlob, { contentType: imageBlob.type || 'image/jpeg', upsert: false });
+        if (imageUpload.error) throw imageUpload.error;
+        const audioUpload = await supabase.storage.from('report-media').upload(audioPath, audioBlob, { contentType: audioBlob.type || 'audio/webm', upsert: false });
+        if (audioUpload.error) throw audioUpload.error;
+
+        const [latitude, longitude] = reportSnapshot.location.gps.split(',').map((v) => Number(v.trim()));
+        const reportInsert = await supabase.from('reports').insert({
+          reporter_id: user.id,
+          species: species || null,
+          symptoms_text: symptoms || null,
+          selected_symptoms: selectedSymptoms,
+          mortality_count: Number(mortality) || 0,
+          village: location.village || null,
+          block: location.block || null,
+          district: location.district || null,
+          latitude: Number.isFinite(latitude) ? latitude : null,
+          longitude: Number.isFinite(longitude) ? longitude : null,
+          assessment: `${diagnosis.disease} (${diagnosis.riskLevel})`,
+          ml_disease: modelResponse.disease,
+          ml_confidence: modelResponse.confidence_percent,
+          image_path: imagePath,
+          audio_path: audioPath,
+          status: 'pending'
+        });
+        if (reportInsert.error) throw reportInsert.error;
       } catch (saveError) {
-        console.warn('Report logged locally (Supabase write skipped/offline):', saveError);
+        setError(`AI result completed, but the report could not be saved: ${saveError instanceof Error ? saveError.message : 'Unknown error'}`);
       } finally {
         setIsSubmitting(false);
         setStep(4);

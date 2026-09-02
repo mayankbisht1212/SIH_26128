@@ -9,7 +9,6 @@ import Advisories from './components/Advisories';
 import Trends from './components/Trends';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
-import { isMockAuth } from './lib/mockAuth';
 import './index.css';
 
 function ProtectedRoutes({ session, onLogout }) {
@@ -33,58 +32,33 @@ function AppRoutes() {
   const [session, setSession] = useState<any>(undefined);
 
   useEffect(() => {
-    // 1. Check local storage for saved session
-    const savedMock = localStorage.getItem('pashuraksha_mock_session');
-    if (savedMock) {
-      try {
-        const parsed = JSON.parse(savedMock);
-        if (parsed) {
-          setSession(parsed);
-          return undefined;
-        }
-      } catch {}
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.getSession().then(({ data }) => setSession(data.session));
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+      return () => listener.subscription.unsubscribe();
     }
 
-    // 2. Default persistent session if non-existent (ensures refresh never logs out)
-    const defaultSession = {
-      user: {
-        id: 'demo-user-1',
-        email: 'ramesh@pashuraksha.gov.in',
-        role: 'Farmer',
-        user_metadata: { full_name: 'Ramesh Yadav', role: 'Farmer' }
-      },
-      access_token: 'dev-demo-token'
-    };
-    localStorage.setItem('pashuraksha_mock_session', JSON.stringify(defaultSession));
-    setSession(defaultSession);
-
-    // 3. Supabase listener if configured
-    if (isSupabaseConfigured && supabase) {
-      supabase.auth.getSession().then(({ data }) => {
-        if (data?.session) {
-          setSession(data.session);
-        }
-      });
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-        if (nextSession) {
-          setSession(nextSession);
-        }
-      });
-      return () => listener.subscription.unsubscribe();
+    const storedDemoSession = localStorage.getItem('pashuraksha_demo_session');
+    if (storedDemoSession) {
+      try {
+        setSession(JSON.parse(storedDemoSession));
+        return;
+      } catch {
+        localStorage.removeItem('pashuraksha_demo_session');
+      }
+    } else {
+      setSession(null);
     }
   }, []);
 
-  const finishMockLogin = (loginPayload: any) => {
-    const sessionObj = loginPayload.session || {
-      user: loginPayload.user || loginPayload,
-      access_token: loginPayload.access_token || `mock-token-${Date.now()}`
-    };
-    localStorage.setItem('pashuraksha_mock_session', JSON.stringify(sessionObj));
-    setSession(sessionObj);
+  const finishDemoLogin = (user: any) => {
+    const demoSession = { user, access_token: 'demo-session-only' };
+    localStorage.setItem('pashuraksha_demo_session', JSON.stringify(demoSession));
+    setSession(demoSession);
   };
 
   const logout = () => {
-    localStorage.removeItem('pashuraksha_mock_session');
+    localStorage.removeItem('pashuraksha_demo_session');
     if (isSupabaseConfigured && supabase) {
       supabase.auth.signOut().catch(() => {});
     }
@@ -94,7 +68,7 @@ function AppRoutes() {
   if (session === undefined) return null;
   return (
     <Routes>
-      <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login onMockLogin={finishMockLogin} />} />
+      <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login onDemoLogin={finishDemoLogin} />} />
       <Route path="/*" element={<ProtectedRoutes session={session} onLogout={logout} />} />
     </Routes>
   );

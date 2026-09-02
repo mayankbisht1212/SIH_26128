@@ -88,6 +88,10 @@ export interface Database {
           latitude: number | null;
           longitude: number | null;
           assessment: string | null;
+          ml_disease: string | null;
+          ml_confidence: number | null;
+          image_path: string | null;
+          audio_path: string | null;
           status: 'pending' | 'reviewed' | 'resolved';
           created_at: string;
         };
@@ -105,6 +109,10 @@ export interface Database {
           latitude?: number | null;
           longitude?: number | null;
           assessment?: string | null;
+          ml_disease?: string | null;
+          ml_confidence?: number | null;
+          image_path?: string | null;
+          audio_path?: string | null;
           status?: 'pending' | 'reviewed' | 'resolved';
           created_at?: string;
         };
@@ -122,6 +130,10 @@ export interface Database {
           latitude?: number | null;
           longitude?: number | null;
           assessment?: string | null;
+          ml_disease?: string | null;
+          ml_confidence?: number | null;
+          image_path?: string | null;
+          audio_path?: string | null;
           status?: 'pending' | 'reviewed' | 'resolved';
           created_at?: string;
         };

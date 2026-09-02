@@ -15,6 +15,12 @@ backend/dist/
 .env.*.local
 frontend/.env.local
 backend/.env.local
+backend/.env
+
+# ─── Python / ML ────────────────────────────────────────────────
+livestock-disease-api-v2/venv/
+livestock-disease-api-v2/.venv/
+livestock-disease-api-v2/__pycache__/
 
 # ─── Logs ────────────────────────────────────────────────────────
 logs/

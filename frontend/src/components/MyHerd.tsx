@@ -4,7 +4,6 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { Activity, Syringe, CalendarCheck } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { requireSupabase, isSupabaseConfigured } from '../lib/supabase';
-import { isMockAuth } from '../lib/mockAuth';
 import { formatDateDDMMYYYY } from '../lib/dateUtils';
 
 const ICONS: Record<string, string> = { 'Cattle (Cow)': '🐄', Buffalo: '🐃', Goat: '🐐', Sheep: '🐑', Poultry: '🐔', Pig: '🐖' };
@@ -56,7 +55,7 @@ export default function MyHerd() {
 
   useEffect(() => {
     const loadAnimals = async () => {
-      if (isMockAuth || !isSupabaseConfigured) {
+      if (!isSupabaseConfigured) {
         setIsLoading(false);
         return;
       }
@@ -102,13 +101,13 @@ export default function MyHerd() {
     setNewAnimal({ id: '', type: 'Cattle (Cow)', status: 'healthy', lastVac: '', vaccine: '', nextVac: '', icon: '🐄' });
 
     // Try cloud save if Supabase is active
-    if (!isMockAuth && isSupabaseConfigured) {
+    if (isSupabaseConfigured) {
       try {
         const client = requireSupabase();
         const { data: { user } } = await client.auth.getUser();
         if (user) {
           await client.from('animals').insert({
-            owner_id: user.id, _id: localItem.id, species: localItem.type,
+            owner_id: user.id, tag_id: localItem.id, species: localItem.type,
             health_status: localItem.status, last_vaccinated_on: localItem.lastVac || null,
             vaccine_name: localItem.vaccine || null, next_vaccination_on: localItem.nextVac || null
           });
@@ -138,7 +137,7 @@ export default function MyHerd() {
     const updated = animals.map((item) => item.id === animal.id ? { ...item, lastVac: today, nextVac: nextYearStr } : item);
     saveToLocal(updated);
 
-    if (!isMockAuth && isSupabaseConfigured && !animal.dbId.startsWith('local-')) {
+    if (isSupabaseConfigured && !animal.dbId.startsWith('local-')) {
       try {
         await requireSupabase().from('animals')
           .update({ last_vaccinated_on: today, next_vaccination_on: nextYearStr })
