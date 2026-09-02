@@ -1,0 +1,11 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.github/
+*.log
+.DS_Store
+.ipynb_checkpoints/
+.env
+.elasticbeanstalk/
