@@ -215,37 +215,45 @@ The frontend stores authenticated reports, media paths, and ML outputs in Supaba
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 19, TypeScript, Vite |
+| **Frontend** | React 19, TypeScript, Vite, Leaflet, Recharts |
 | **Styling** | Vanilla CSS, CSS Variables |
-| **Charts** | Recharts |
-| **Backend** | Node.js, Express, TypeScript |
-| **ML Model** | FastAPI, TensorFlow/Keras, EfficientNetB0 |
-| **Database** | Supabase (PostgreSQL + Row-Level Security) |
-| **Deployment** | Docker (ML model), Vercel/Netlify (frontend) |
-| **Containerization** | Docker, Docker Compose (optional) |
+| **Backend** | Node.js, Express, TypeScript, Axios |
+| **ML Model** | FastAPI, Python 3.11, TensorFlow 2.21.0, Keras, EfficientNetB0 |
+| **Database** | Supabase (PostgreSQL + Row-Level Security + Auth) |
+| **Deployment** | Docker (ML model), Vercel/Netlify (frontend), Railway/Fly.io (backend) |
+| **Containerization** | Docker |
+
+**📖 See [TECH_STACK.md](TECH_STACK.md) for detailed technology breakdown, version numbers, and architecture rationale.**
 
 ---
 
-## 📦 Dependencies
+## 📦 Key Dependencies
 
-### Frontend
-- `react`: UI framework
-- `recharts`: Charts for trends
-- `@supabase/supabase-js`: Database & auth client
-- `vite`: Build tool
+### Frontend (React 19 + TypeScript)
+- `react` & `react-dom` — UI framework
+- `react-router-dom` — Client routing
+- `@supabase/supabase-js` — Database & Auth
+- `recharts` — Charts for epidemiological trends
+- `leaflet` & `react-leaflet` — Geospatial mapping
+- `lucide-react` — Icon library
+- `vite` — Build tool & dev server
+- `typescript` — Static type checking
 
-### Backend
-- `express`: Web framework
-- `axios`: HTTP client (for ML API calls)
-- `cors`: Cross-origin middleware
-- `typescript`: Type safety
+### Backend (Node.js + Express)
+- `express` — Web framework
+- `axios` — HTTP client for ML API
+- `cors` — Cross-origin middleware
+- `multer` — File upload handling
+- `typescript` — Type safety
+- `tsx` — TypeScript executor for development
 
-### ML Model
-- `fastapi`: Web framework
-- `tensorflow==2.21.0`: Deep learning
-- `pillow`: Image processing
-- `numpy`: Numerical computing
-- `uvicorn`: ASGI server
+### ML Model (Python 3.11)
+- `fastapi` — High-performance web framework
+- `tensorflow==2.21.0` — Deep learning library
+- `keras` — Neural network API (via TensorFlow)
+- `pillow` — Image processing
+- `numpy` — Numerical computing
+- `uvicorn` — ASGI server
 
 ---
 
@@ -348,6 +356,15 @@ For issues or questions:
 
 ---
 
-## 📜 License
+## � Documentation
+
+For detailed information, refer to these documentation files:
+
+- **[TECH_STACK.md](TECH_STACK.md)** — Complete technology breakdown, versions, architecture rationale, and performance considerations
+- **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** — Database design, table definitions, relationships, RLS policies, and triggers
+
+---
+
+## �📜 License
 
 Built for Smart India Hackathon 2026. All rights reserved.
