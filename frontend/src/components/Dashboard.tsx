@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
-import { MapPin, Phone, Camera, PawPrint, Megaphone, HeartPulse, TrendingUp, ChevronRight, Sparkles, X, AlertOctagon, CheckCircle2, Activity } from 'lucide-react';
+import { MapPin, Phone, Camera, Megaphone, HeartPulse, TrendingUp, ChevronRight, Sparkles, X, AlertOctagon, CheckCircle2, Activity } from 'lucide-react';
 import './Tabs.css';
 import { formatDateDDMMYYYY } from '../lib/dateUtils';
 

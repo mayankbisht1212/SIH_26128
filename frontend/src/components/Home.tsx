@@ -1,10 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { User, Globe, Moon, Sun, AlertTriangle, PawPrint, Megaphone, TrendingUp, Settings, Home as HomeIcon, Bell, X, CheckCircle2 } from 'lucide-react';
+import { User, Globe, Moon, Sun, AlertTriangle, Megaphone, TrendingUp, Settings, Home as HomeIcon, Bell, X, CheckCircle2 } from 'lucide-react';
 import './Home.css';
 import './Tabs.css';
 import { useLanguage } from '../i18n/LanguageContext';
 import { requireSupabase, supabase } from '../lib/supabase';
+
+// Custom Cow Icon for My Animals tab
+export function CowIcon({ size = 22, color = 'currentColor', className = '' }: { size?: number; color?: string; className?: string }) {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke={color} 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      className={className}
+      style={{ display: 'inline-block', verticalAlign: 'middle' }}
+    >
+      {/* Horns */}
+      <path d="M4 8C3 4.5 5 2.5 7 4" />
+      <path d="M20 8C21 4.5 19 2.5 17 4" />
+      {/* Ears */}
+      <path d="M5 9.5C2.5 10 2.5 12.5 5 12.5" />
+      <path d="M19 9.5C21.5 10 21.5 12.5 19 12.5" />
+      {/* Head Outline */}
+      <path d="M6 7.5H18V13.5C18 16.5 15.5 18 12 18C8.5 18 6 16.5 6 13.5V7.5Z" />
+      {/* Muzzle / Snout */}
+      <path d="M7.5 14C7.5 13.2 8.2 12.5 9 12.5H15C15.8 12.5 16.5 13.2 16.5 14V17C16.5 18.5 14.5 19.5 12 19.5C9.5 19.5 7.5 18.5 7.5 17V14Z" />
+      {/* Nostrils */}
+      <circle cx="10" cy="16.5" r="0.8" fill={color} stroke="none" />
+      <circle cx="14" cy="16.5" r="0.8" fill={color} stroke="none" />
+      {/* Eyes */}
+      <circle cx="9" cy="10" r="1" fill={color} stroke="none" />
+      <circle cx="15" cy="10" r="1" fill={color} stroke="none" />
+    </svg>
+  );
+}
 
 export default function Home({ children, onLogout }) {
   const navigate = useNavigate();
@@ -226,7 +261,7 @@ export default function Home({ children, onLogout }) {
           className={`nav-item ${activeTab === 'herd' ? 'active' : ''}`}
           onClick={() => navigate('/herd')}
         >
-          <span className="nav-icon"><PawPrint size={22} /></span>
+          <span className="nav-icon"><CowIcon size={22} /></span>
           <span className="nav-label">My Animals</span>
         </button>
         
