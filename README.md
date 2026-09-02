@@ -81,6 +81,8 @@ Run the migration in your Supabase project's **SQL Editor**:
 ```
 This creates the `profiles`, `animals`, and `reports` tables with Row-Level Security (RLS) policies.
 
+**📖 See [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for detailed schema documentation.**
+
 ### 3. Configure environment variables
 
 #### Frontend
