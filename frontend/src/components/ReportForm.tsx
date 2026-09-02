@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Camera, Image as ImageIcon, Mic, Square, ArrowRight, X, MapPin, AlertOctagon, CheckCircle2, Clock, ChevronRight, Activity, FileText, Check, AlertTriangle, Play, Pause, Navigation, Layers } from 'lucide-react';
 import './ReportForm.css';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -8,11 +8,13 @@ import { supabase } from '../lib/supabase';
 export default function ReportForm({ initialImage }: { initialImage?: string | null }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const routeLocation = useLocation();
   const [step, setStep] = useState(2);
-  const [image, setImage] = useState(initialImage || null);
+  const [image, setImage] = useState<string | null>(initialImage || routeLocation.state?.image || null);
   const [symptoms, setSymptoms] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [audioURL, setAudioURL] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
 
@@ -187,6 +189,7 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
       recorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
+        setAudioBlob(blob);
         setAudioURL(url);
         stream.getTracks().forEach(t => t.stop());
         streamRef.current = null;
@@ -204,7 +207,48 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
   const deleteRecording = () => {
     if (audioURL) URL.revokeObjectURL(audioURL);
     setAudioURL(null);
+    setAudioBlob(null);
     setRecordingSeconds(0);
+  };
+
+  const diagnosisFromModel = (prediction: { disease: string; confidence_percent: number }) => {
+    const disease = prediction.disease.replace(/_/g, ' ');
+    const isHealthy = prediction.disease === 'Healthy';
+    const isLumpySkin = prediction.disease === 'Lumpy_Skin';
+    return {
+      disease,
+      confidence: `${prediction.confidence_percent}%`,
+      riskLevel: isHealthy ? 'NO VISUAL DISEASE DETECTED' : isLumpySkin ? 'HIGH RISK' : 'VETERINARY REVIEW NEEDED',
+      riskColor: isHealthy ? '#16a34a' : isLumpySkin ? '#dc2626' : '#f59e0b',
+      precautions: isHealthy
+        ? ['Continue routine health monitoring.', 'Keep vaccination and deworming schedules up to date.', 'Contact a veterinarian if symptoms worsen.']
+        : isLumpySkin
+          ? ['Isolate the affected animal from healthy animals immediately.', 'Use vector-control measures for flies and mosquitoes.', 'Contact the nearest veterinarian for treatment and vaccination guidance.']
+          : ['Keep the animal isolated until examined by a veterinarian.', 'Provide clean water and a clean, dry resting area.', 'Arrange a veterinary examination as soon as possible.']
+    };
+  };
+
+  const requestModelPrediction = async () => {
+    if (!image || !audioBlob) {
+      throw new Error('Please attach a symptom photograph and record a voice message before submitting for AI analysis.');
+    }
+
+    const imageResponse = await fetch(image);
+    if (!imageResponse.ok) throw new Error('The selected photo could not be prepared for AI analysis.');
+    const imageBlob = await imageResponse.blob();
+    const formData = new FormData();
+    formData.append('file', imageBlob, 'animal-photo.jpg');
+    formData.append('audio', audioBlob, 'voice-message.webm');
+
+    const response = await fetch(`${import.meta.env.VITE_ML_API_URL || 'http://localhost:5001'}/predict`, {
+      method: 'POST',
+      body: formData
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.detail || 'The ML service could not analyse this report. Please try again.');
+    }
+    return payload as { disease: string; confidence_percent: number; audio: { received: boolean } };
   };
 
   const toggleSymptom = (s: string) => {
@@ -286,7 +330,16 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
       setError('');
       setIsSubmitting(true);
 
-      const diagnosis = calculateDiagnosis();
+      let modelResponse: { disease: string; confidence_percent: number; audio: { received: boolean } };
+      try {
+        modelResponse = await requestModelPrediction();
+      } catch (predictionError) {
+        setError(predictionError instanceof Error ? predictionError.message : 'Unable to reach the ML service. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const diagnosis = diagnosisFromModel(modelResponse);
       const reportSnapshot = {
         id: `REP-${Math.floor(100000 + Math.random() * 900000)}`,
         timestamp: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
@@ -306,7 +359,8 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
           district: location.district || 'Anand',
           gps: location.gps || '22.5645, 72.9289'
         },
-        diagnosis: diagnosis
+        diagnosis: diagnosis,
+        mlResponse: modelResponse
       };
 
       setSubmittedReportData(reportSnapshot);
@@ -630,7 +684,7 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
                 {submittedReportData.diagnosis.disease}
               </h3>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: 1.4 }}>
-                Clinical indicators have been flagged for active veterinary cluster surveillance in {submittedReportData.location.district}.
+                ML model result from the submitted photo and voice message. Audio received: {submittedReportData.mlResponse.audio.received ? 'yes' : 'no'}.
               </p>
             </div>
 
@@ -780,4 +834,3 @@ export default function ReportForm({ initialImage }: { initialImage?: string | n
     </div>
   );
 }
-

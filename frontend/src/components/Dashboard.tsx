@@ -44,10 +44,14 @@ export default function Dashboard({ profileData }: { profileData?: { name?: stri
     };
   }, []);
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const reader = new FileReader();
-      reader.onload = () => navigate('/report');
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          navigate('/report', { state: { image: reader.result } });
+        }
+      };
       reader.readAsDataURL(e.target.files[0]);
     }
   };
